@@ -40,6 +40,9 @@ coverage/
 # TypeScript
 *.tsbuildinfo
 
+# npm (if someone runs npm by accident)
+package-lock.json
+
 # NestJS specific
 storage/
 uploads/

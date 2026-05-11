@@ -31,21 +31,23 @@ Monorepo for the SECOP Bidding Analysis Platform — automating discovery, class
 
 ## Getting Started
 
+**Requires [Bun](https://bun.sh) >= 1.3**
+
 ```bash
 # Install dependencies
-npm install
+bun install
 
 # Start infrastructure
-docker compose up -d
+bun run docker:up
 
 # Run database migrations
-npm run migration:run -w apps/nest
+bun run --cwd apps/nest migration:run
 
 # Start backend (port 3000)
-npm run dev:nest
+bun run dev:nest
 
 # Start frontend (port 5173)
-npm run dev:web
+bun run dev:web
 ```
 
 ## Project Structure
