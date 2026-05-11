@@ -1,0 +1,22 @@
+{
+  "name": "secop-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Monorepo for SECOP bidding analysis platform — NestJS backend + React dashboard",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:nest": "npm run start:dev -w apps/nest",
+    "dev:web": "npm run dev -w apps/web",
+    "build:nest": "npm run build -w apps/nest",
+    "build:web": "npm run build -w apps/web",
+    "test": "npm run test -w apps/nest",
+    "lint": "npm run lint -w apps/nest && npm run lint -w apps/web",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

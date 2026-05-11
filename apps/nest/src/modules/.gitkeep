@@ -1,0 +1,3 @@
+# NestJS Modules
+# Each module will be implemented per sprint plan:
+# - auth, convocatorias, companies, scoring, llm, documents, rag, competitors, alerts, audit
