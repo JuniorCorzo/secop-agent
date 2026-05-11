@@ -12,9 +12,9 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
-    "migration:generate": "typeorm migration:generate",
-    "migration:run": "typeorm migration:run",
-    "migration:revert": "typeorm migration:revert"
+    "migration:generate": "bun -r ./scripts/typeorm-stub.ts ./node_modules/typeorm/cli.js migration:generate -d ./src/data-source.ts",
+    "migration:run": "bun -r ./scripts/typeorm-stub.ts ./node_modules/typeorm/cli.js migration:run -d ./src/data-source.ts",
+    "migration:revert": "bun -r ./scripts/typeorm-stub.ts ./node_modules/typeorm/cli.js migration:revert -d ./src/data-source.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
@@ -44,11 +44,13 @@
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.0",
+    "@swc/cli": "^0.8.1",
+    "@swc/core": "^1.15.33",
+    "@types/bcrypt": "^5.0.0",
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.0",
     "@types/node": "^22.0.0",
     "@types/passport-jwt": "^4.0.0",
-    "@types/bcrypt": "^5.0.0",
     "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",

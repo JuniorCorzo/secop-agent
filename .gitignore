@@ -58,3 +58,9 @@ uploads/
 tmp/
 temp/
 .tmp/
+
+# Local agent/skill tooling
+.agents/
+.claude/
+.kiro/
+skills-lock.json

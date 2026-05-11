@@ -1,13 +1,24 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  Tech stack: NestJS (backend), React + Vite (frontend), PostgreSQL + pgvector, Redis, BullMQ
+  Package manager: bun
+  Monorepo: workspaces under apps/nest and apps/web
+  Domain: SECOP licitaciones (Colombian public bidding analysis platform)
+  Backend conventions:
+    - Modular structure: src/common/, src/config/, src/modules/
+    - Placeholder modules only; no business logic in scaffold issues
+    - Strict TypeScript: noImplicitAny, strictBindCallApply, noFallthroughCasesInSwitch
+    - Builder: SWC (requires @swc/cli + @swc/core)
+  Current change (ANC-61): backend modular scaffold complete in apps/nest
+    - Config factories: app, database, llm, hermes
+    - Common module: global placeholder with decorators/filters/guards/interceptors/pipes subdirs
+    - Domain placeholders: auth, convocatorias, companies, scoring, competitors, rag, documents, llm, alerts, audit
+    - Root composition: AppModule imports ConfigModule + CommonModule + all domain modules
+    - Bootstrap: ValidationPipe, CORS, global prefix 'api'
+    - TypeScript strictness: noImplicitAny, strictBindCallApply, noFallthroughCasesInSwitch
+    - Build tool: SWC via @nestjs/cli (typeCheck + swc builder)
+  We use conventional commits
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.
