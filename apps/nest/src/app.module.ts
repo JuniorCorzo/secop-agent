@@ -9,34 +9,20 @@ import { CompaniesModule } from './modules/companies/companies.module';
 import { CompetitorsModule } from './modules/competitors/competitors.module';
 import { ConvocatoriasModule } from './modules/convocatorias/convocatorias.module';
 import { DocumentsModule } from './modules/documents/documents.module';
+import { HealthModule } from './modules/health/health.module';
 import { LlmModule } from './modules/llm/llm.module';
 import { RagModule } from './modules/rag/rag.module';
 import { ScoringModule } from './modules/scoring/scoring.module';
-import { databaseConfig } from './config/database.config';
-import { SchemaHealth } from './common/entities/schema-health.entity';
+import { validateEnvironment } from './config/env.validation';
+import { createTypeOrmOptions } from './config/typeorm.options';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnvironment }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: () => {
-        const db = databaseConfig();
-        return {
-          type: 'postgres' as const,
-          host: db.host,
-          port: db.port,
-          username: db.username,
-          password: db.password,
-          database: db.database,
-          schema: db.schema,
-          ssl: db.ssl,
-          logging: db.logging,
-          synchronize: false,
-          entities: [SchemaHealth],
-        };
-      },
+      useFactory: (configService: ConfigService) => createTypeOrmOptions(configService),
     }),
     CommonModule,
     AlertsModule,
@@ -46,6 +32,7 @@ import { SchemaHealth } from './common/entities/schema-health.entity';
     CompetitorsModule,
     ConvocatoriasModule,
     DocumentsModule,
+    HealthModule,
     LlmModule,
     RagModule,
     ScoringModule,

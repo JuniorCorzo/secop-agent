@@ -10,14 +10,14 @@ context: |
     - Placeholder modules only; no business logic in scaffold issues
     - Strict TypeScript: noImplicitAny, strictBindCallApply, noFallthroughCasesInSwitch
     - Builder: SWC (requires @swc/cli + @swc/core)
-  Current change (ANC-61): backend modular scaffold complete in apps/nest
-    - Config factories: app, database, llm, hermes
-    - Common module: global placeholder with decorators/filters/guards/interceptors/pipes subdirs
-    - Domain placeholders: auth, convocatorias, companies, scoring, competitors, rag, documents, llm, alerts, audit
-    - Root composition: AppModule imports ConfigModule + CommonModule + all domain modules
-    - Bootstrap: ValidationPipe, CORS, global prefix 'api'
-    - TypeScript strictness: noImplicitAny, strictBindCallApply, noFallthroughCasesInSwitch
-    - Build tool: SWC via @nestjs/cli (typeCheck + swc builder)
+  Completed changes:
+    - ANC-61 (backbone-modular-foundation): NestJS scaffold with 10 domain placeholders, strict TS, SWC. ARCHIVED.
+    - ANC-62 (persistence-foundation): TypeORM wired, baseline migration (pgvector+pg_trgm+health), Docker DB verified. ARCHIVED. Domain tables pending (implemented incrementally with ANC-67+).
+  ANC-64 in progress:
+    - Env validation via ConfigModule + class-validator/class-transformer
+    - Added auth/redis config factories and `apps/nest/.env.example`
+    - Added `HealthModule` with Postgres, Redis, Hermes, and LLM checks
+    - Bootstrap and TypeORM wiring now use `ConfigService` values, not direct `process.env`
   We use conventional commits
 
 # Per-artifact rules (optional)
