@@ -11,6 +11,8 @@ export interface DatabaseConfig {
   logging: boolean;
 }
 
+const toBoolean = (value: unknown): boolean => value === true || value === 'true';
+
 /**
  * Shared database configuration factory for runtime NestJS and CLI parity.
  * Returns env-driven settings suitable for TypeORM wiring (ANC-62+).
@@ -28,6 +30,6 @@ export const databaseConfig = (
   password: env.DB_PASSWORD,
   database: env.DB_NAME,
   schema: env.DB_SCHEMA ?? 'public',
-  ssl: env.DB_SSL,
-  logging: env.DB_LOGGING,
+  ssl: toBoolean(env.DB_SSL),
+  logging: toBoolean(env.DB_LOGGING),
 });

@@ -55,6 +55,14 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsNotEmpty()
+  ADMIN_EMAIL?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  ADMIN_PASSWORD?: string;
+
+  @IsString()
+  @IsNotEmpty()
   REDIS_HOST?: string;
 
   @Type(() => Number)
@@ -92,6 +100,8 @@ export type EnvironmentConfig = Pick<
   | 'DB_LOGGING'
   | 'JWT_SECRET'
   | 'JWT_EXPIRES_IN'
+  | 'ADMIN_EMAIL'
+  | 'ADMIN_PASSWORD'
   | 'REDIS_HOST'
   | 'REDIS_PORT'
   | 'REDIS_PASSWORD'
@@ -102,7 +112,7 @@ export type EnvironmentConfig = Pick<
 
 export const validateEnvironment = (config: Record<string, unknown>): EnvironmentConfig => {
   const validatedConfig = plainToInstance(EnvironmentVariables, config, {
-    enableImplicitConversion: true,
+    enableImplicitConversion: false,
   });
 
   const errors = validateSync(validatedConfig, {

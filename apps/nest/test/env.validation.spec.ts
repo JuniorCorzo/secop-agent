@@ -15,6 +15,8 @@ describe('validateEnvironment', () => {
       DB_LOGGING: false,
       JWT_SECRET: 'secret',
       JWT_EXPIRES_IN: '7d',
+      ADMIN_EMAIL: 'admin@secop.com',
+      ADMIN_PASSWORD: 'admin-secret',
       REDIS_HOST: 'localhost',
       REDIS_PORT: 6379,
       REDIS_PASSWORD: '',
