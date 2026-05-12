@@ -1,3 +1,5 @@
+import type { EnvironmentConfig } from './env.validation';
+
 export interface DatabaseConfig {
   host: string;
   port: number;
@@ -14,13 +16,18 @@ export interface DatabaseConfig {
  * Returns env-driven settings suitable for TypeORM wiring (ANC-62+).
  * Does NOT include TypeORM-specific options (type, synchronize, entities, migrations).
  */
-export const databaseConfig = (): DatabaseConfig => ({
-  host: process.env.DB_HOST ?? 'localhost',
-  port: parseInt(process.env.DB_PORT ?? '5432', 10),
-  username: process.env.DB_USERNAME ?? '',
-  password: process.env.DB_PASSWORD ?? '',
-  database: process.env.DB_NAME ?? '',
-  schema: process.env.DB_SCHEMA ?? 'public',
-  ssl: process.env.DB_SSL === 'true',
-  logging: process.env.DB_LOGGING === 'true',
+export const databaseConfig = (
+  env: Pick<
+    EnvironmentConfig,
+    'DB_HOST' | 'DB_PORT' | 'DB_USERNAME' | 'DB_PASSWORD' | 'DB_NAME' | 'DB_SCHEMA' | 'DB_SSL' | 'DB_LOGGING'
+  >,
+): DatabaseConfig => ({
+  host: env.DB_HOST,
+  port: env.DB_PORT,
+  username: env.DB_USERNAME,
+  password: env.DB_PASSWORD,
+  database: env.DB_NAME,
+  schema: env.DB_SCHEMA ?? 'public',
+  ssl: env.DB_SSL,
+  logging: env.DB_LOGGING,
 });
