@@ -11,6 +11,7 @@ import { ConvocatoriasModule } from './modules/convocatorias/convocatorias.modul
 import { DocumentsModule } from './modules/documents/documents.module';
 import { HealthModule } from './modules/health/health.module';
 import { LlmModule } from './modules/llm/llm.module';
+import { QueuesModule } from './modules/queues/queues.module';
 import { RagModule } from './modules/rag/rag.module';
 import { ScoringModule } from './modules/scoring/scoring.module';
 import { validateEnvironment } from './config/env.validation';
@@ -34,6 +35,7 @@ import { createTypeOrmOptions } from './config/typeorm.options';
     DocumentsModule,
     HealthModule,
     LlmModule,
+    QueuesModule,
     RagModule,
     ScoringModule,
   ],
