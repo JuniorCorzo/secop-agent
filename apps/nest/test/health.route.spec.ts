@@ -1,9 +1,11 @@
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { AddressInfo } from 'node:net';
+import { getQueueToken } from '@nestjs/bullmq';
 import { HealthController } from '../src/modules/health/health.controller';
 import { HealthService } from '../src/modules/health/health.service';
 import { DataSource } from 'typeorm';
+import { QUEUE_NAMES } from '../src/modules/queues/constants/queue-names';
 
 jest.mock('../src/modules/health/indicators/postgres.indicator', () => ({
   checkPostgresHealth: jest.fn(async () => ({ name: 'database', status: 'up' })),
@@ -16,6 +18,14 @@ jest.mock('../src/modules/health/indicators/redis.indicator', () => ({
 jest.mock('../src/modules/health/indicators/http.indicator', () => ({
   checkHttpHealth: jest.fn(async (name: string) => ({ name, status: 'up' })),
   checkLlmHealth: jest.fn(async () => ({ name: 'llm', status: 'up' })),
+}));
+
+jest.mock('../src/modules/health/indicators/queue.indicator', () => ({
+  checkQueueHealth: jest.fn(async () => ({
+    name: 'queue:example',
+    status: 'up',
+    counts: { waiting: 0, active: 0, completed: 0, failed: 0 },
+  })),
 }));
 
 describe('Health route', () => {
@@ -38,6 +48,18 @@ describe('Health route', () => {
             }),
           },
         },
+        {
+          provide: getQueueToken(QUEUE_NAMES.EXAMPLE),
+          useValue: {
+            name: QUEUE_NAMES.EXAMPLE,
+            getJobCounts: jest.fn().mockResolvedValue({
+              waiting: 0,
+              active: 0,
+              completed: 0,
+              failed: 0,
+            }),
+          },
+        },
       ],
     }).compile();
 
@@ -53,6 +75,7 @@ describe('Health route', () => {
       expect(response.status).toBe(200);
       expect(body.status).toBe('ok');
       expect(body.checks.database.status).toBe('up');
+      expect(body.checks.queue.status).toBe('up');
     } finally {
       await app.close();
     }
