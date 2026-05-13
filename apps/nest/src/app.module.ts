@@ -7,7 +7,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CompaniesModule } from './modules/companies/companies.module';
 import { CompetitorsModule } from './modules/competitors/competitors.module';
-import { ConvocatoriasModule } from './modules/convocatorias/convocatorias.module';
+import { ProcurementNoticesModule } from './modules/procurement-notices/procurement-notices.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { HealthModule } from './modules/health/health.module';
 import { LlmModule } from './modules/llm/llm.module';
@@ -31,7 +31,7 @@ import { createTypeOrmOptions } from './config/typeorm.options';
     AuthModule,
     CompaniesModule,
     CompetitorsModule,
-    ConvocatoriasModule,
+    ProcurementNoticesModule,
     DocumentsModule,
     HealthModule,
     LlmModule,

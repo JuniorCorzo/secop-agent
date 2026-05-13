@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { SchemaHealth } from '../common/entities/schema-health.entity';
 import { User } from '../modules/auth/entities/user.entity';
+import { ProcurementNotice } from '../modules/procurement-notices/entities/procurement-notice.entity';
 import { databaseConfig } from './database.config';
 
 export const createTypeOrmOptions = (configService: ConfigService) => {
@@ -27,7 +28,7 @@ export const createTypeOrmOptions = (configService: ConfigService) => {
     schema: db.schema,
     logging: db.logging,
     synchronize: false,
-    entities: [SchemaHealth, User],
+    entities: [SchemaHealth, User, ProcurementNotice],
     ...(db.ssl ? { ssl: { rejectUnauthorized: false } } : {}),
   };
 };

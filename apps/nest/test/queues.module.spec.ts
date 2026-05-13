@@ -1,10 +1,12 @@
 import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { BullModule, getQueueToken } from '@nestjs/bullmq';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { QueuesModule } from '../src/modules/queues/queues.module';
 import { ExampleQueueProducer } from '../src/modules/queues/producers/example-queue.producer';
 import { ExampleQueueWorker } from '../src/modules/queues/workers/example-queue.worker';
 import { QUEUE_NAMES } from '../src/modules/queues/constants/queue-names';
+import { ProcurementNotice } from '../src/modules/procurement-notices/entities/procurement-notice.entity';
 
 describe('QueuesModule', () => {
   it('wires queue providers and worker', async () => {
@@ -39,6 +41,11 @@ describe('QueuesModule', () => {
           completed: 0,
           failed: 0,
         }),
+      })
+      .overrideProvider(getRepositoryToken(ProcurementNotice))
+      .useValue({
+        find: jest.fn(),
+        upsert: jest.fn(),
       })
       .compile();
 

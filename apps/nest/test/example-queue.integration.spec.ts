@@ -1,11 +1,13 @@
 import { Test } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
 import { BullModule, getQueueToken } from '@nestjs/bullmq';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { Job } from 'bullmq';
 import { QueuesModule } from '../src/modules/queues/queues.module';
 import { ExampleQueueProducer } from '../src/modules/queues/producers/example-queue.producer';
 import { ExampleQueueWorker } from '../src/modules/queues/workers/example-queue.worker';
 import { QUEUE_NAMES } from '../src/modules/queues/constants/queue-names';
+import { ProcurementNotice } from '../src/modules/procurement-notices/entities/procurement-notice.entity';
 
 describe('ExampleQueue Integration', () => {
   it('enqueues, processes, and completes an example job', async () => {
@@ -44,6 +46,11 @@ describe('ExampleQueue Integration', () => {
     })
       .overrideProvider(getQueueToken(QUEUE_NAMES.EXAMPLE))
       .useValue(queueMock)
+      .overrideProvider(getRepositoryToken(ProcurementNotice))
+      .useValue({
+        find: jest.fn(),
+        upsert: jest.fn(),
+      })
       .compile();
 
     const producer = moduleRef.get(ExampleQueueProducer);

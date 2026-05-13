@@ -3,6 +3,7 @@ import { databaseConfig } from './config/database.config';
 import { validateEnvironment } from './config/env.validation';
 import { SchemaHealth } from './common/entities/schema-health.entity';
 import { User } from './modules/auth/entities/user.entity';
+import { ProcurementNotice } from './modules/procurement-notices/entities/procurement-notice.entity';
 
 const env = validateEnvironment(process.env as Record<string, unknown>);
 const db = databaseConfig(env);
@@ -17,7 +18,7 @@ export const dataSourceOptions: DataSourceOptions = {
   schema: db.schema,
   logging: db.logging,
   synchronize: false,
-  entities: [SchemaHealth, User],
+  entities: [SchemaHealth, User, ProcurementNotice],
   migrations: ['src/migrations/*.ts'],
   migrationsTableName: 'typeorm_migrations',
   ...(db.ssl ? { ssl: { rejectUnauthorized: false } } : {}),
