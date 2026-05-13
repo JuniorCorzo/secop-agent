@@ -1,9 +1,13 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { QUEUE_NAMES } from './constants/queue-names';
 import { ExampleQueueProducer } from './producers/example-queue.producer';
 import { ExampleQueueWorker } from './workers/example-queue.worker';
+import { ProcurementIngestionProducer } from './producers/procurement-ingestion.producer';
+import { ProcurementIngestionWorker } from './workers/procurement-ingestion.worker';
+import { ProcurementNotice } from '../procurement-notices/entities/procurement-notice.entity';
 
 @Module({
   imports: [
@@ -18,11 +22,18 @@ import { ExampleQueueWorker } from './workers/example-queue.worker';
         },
       }),
     }),
-    BullModule.registerQueue({
-      name: QUEUE_NAMES.EXAMPLE,
-    }),
+    BullModule.registerQueue(
+      { name: QUEUE_NAMES.EXAMPLE },
+      { name: QUEUE_NAMES.PROCUREMENT_NOTICE_INGESTION },
+    ),
+    TypeOrmModule.forFeature([ProcurementNotice]),
   ],
-  providers: [ExampleQueueProducer, ExampleQueueWorker],
-  exports: [BullModule, ExampleQueueProducer],
+  providers: [
+    ExampleQueueProducer,
+    ExampleQueueWorker,
+    ProcurementIngestionProducer,
+    ProcurementIngestionWorker,
+  ],
+  exports: [BullModule, ExampleQueueProducer, ProcurementIngestionProducer],
 })
 export class QueuesModule {}

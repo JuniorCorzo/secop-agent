@@ -1,9 +1,9 @@
 import { Test } from '@nestjs/testing';
 import { BullModule, getQueueToken } from '@nestjs/bullmq';
 import { Queue, Worker, Job } from 'bullmq';
-import { ExampleQueueProducer } from '../src/modules/queues/producers/example-queue.producer';
+import { ProcurementIngestionProducer } from '../src/modules/queues/producers/procurement-ingestion.producer';
 
-const TEST_QUEUE_NAME = 'test-example-terminal';
+const TEST_QUEUE_NAME = 'test-procurement-terminal';
 
 async function waitForState(
   job: Job,
@@ -27,10 +27,10 @@ async function waitForState(
   });
 }
 
-describe('BullMQ Terminal States (real Redis via producer defaults)', () => {
+describe('Procurement Ingestion Terminal States (real Redis)', () => {
   const connection = { host: 'localhost', port: 6379 };
   let moduleRef: any;
-  let producer: ExampleQueueProducer;
+  let producer: ProcurementIngestionProducer;
   let queue: Queue;
 
   beforeAll(async () => {
@@ -41,14 +41,14 @@ describe('BullMQ Terminal States (real Redis via producer defaults)', () => {
       ],
       providers: [
         {
-          provide: ExampleQueueProducer,
-          useFactory: (q: Queue) => new ExampleQueueProducer(q),
+          provide: ProcurementIngestionProducer,
+          useFactory: (q: Queue) => new ProcurementIngestionProducer(q),
           inject: [getQueueToken(TEST_QUEUE_NAME)],
         },
       ],
     }).compile();
 
-    producer = moduleRef.get(ExampleQueueProducer);
+    producer = moduleRef.get(ProcurementIngestionProducer);
     queue = moduleRef.get(getQueueToken(TEST_QUEUE_NAME));
     await queue.waitUntilReady();
     await queue.obliterate({ force: true }).catch(() => {});
@@ -71,38 +71,37 @@ describe('BullMQ Terminal States (real Redis via producer defaults)', () => {
       await worker?.close();
     });
 
-    it('reaches completed state after successful processing with producer defaults', async () => {
+    it('reaches completed after successful processing with producer defaults', async () => {
       worker = new Worker(
         TEST_QUEUE_NAME,
         async (job) => {
-          return { processed: true, jobId: job.id, input: job.data.message };
+          return {
+            created: job.data.records.length,
+            updated: 0,
+            failed: 0,
+            errors: [],
+          };
         },
         { connection },
       );
 
       const job = await producer.add({
-        message: 'terminal-test',
-        timestamp: Date.now(),
+        records: [{ secopId: 'SECOP-001', title: 'Terminal Test' }],
       });
       expect(job.id).toBeDefined();
-
-      // Prove producer defaults were applied
       expect(job.opts.attempts).toBe(3);
       expect(job.opts.backoff).toEqual({ type: 'exponential', delay: 2000 });
 
       await waitForState(job, 'completed');
 
-      // Re-fetch from Redis so cached properties reflect the terminal state
       const finished = await queue.getJob(job.id!);
       expect(finished).not.toBeNull();
-
-      const state = await finished!.getState();
-      expect(state).toBe('completed');
-
+      expect(await finished!.getState()).toBe('completed');
       expect(finished!.returnvalue).toEqual({
-        processed: true,
-        jobId: finished!.id,
-        input: 'terminal-test',
+        created: 1,
+        updated: 0,
+        failed: 0,
+        errors: [],
       });
 
       const counts = await queue.getJobCounts('waiting', 'active', 'completed', 'failed');
@@ -119,7 +118,7 @@ describe('BullMQ Terminal States (real Redis via producer defaults)', () => {
     });
 
     it(
-      'reaches failed state after exhausting producer default retries',
+      'reaches failed after exhausting producer default retries',
       async () => {
         let processAttempts = 0;
 
@@ -127,33 +126,26 @@ describe('BullMQ Terminal States (real Redis via producer defaults)', () => {
           TEST_QUEUE_NAME,
           async () => {
             processAttempts++;
-            throw new Error('Intentional retryable failure');
+            throw new Error('Intentional ingestion failure');
           },
           { connection },
         );
 
         const job = await producer.add({
-          message: 'fail-test',
-          timestamp: Date.now(),
+          records: [{ secopId: 'SECOP-FAIL', title: 'Fail Test' }],
         });
         expect(job.id).toBeDefined();
-
-        // Prove producer defaults were applied
         expect(job.opts.attempts).toBe(3);
         expect(job.opts.backoff).toEqual({ type: 'exponential', delay: 2000 });
 
         await waitForState(job, 'failed', 12000);
 
-        // Re-fetch from Redis so cached properties reflect the terminal state
         const finished = await queue.getJob(job.id!);
         expect(finished).not.toBeNull();
-
-        const state = await finished!.getState();
-        expect(state).toBe('failed');
-
+        expect(await finished!.getState()).toBe('failed');
         expect(processAttempts).toBe(3);
         expect(finished!.attemptsMade).toBe(3);
-        expect(finished!.failedReason).toBe('Intentional retryable failure');
+        expect(finished!.failedReason).toBe('Intentional ingestion failure');
 
         const counts = await queue.getJobCounts('waiting', 'active', 'completed', 'failed');
         expect(counts.failed).toBe(1);
