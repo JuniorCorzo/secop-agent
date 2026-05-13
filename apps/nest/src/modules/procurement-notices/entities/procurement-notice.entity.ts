@@ -1,11 +1,13 @@
 import {
   Column,
   CreateDateColumn,
+  DeleteDateColumn,
   Entity,
   Index,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { ProcurementNoticeStatus } from '../procurement-notice.types';
 
 @Entity({ name: 'procurement_notices' })
 @Index('UQ_procurement_notices_secop_id', ['secopId'], { unique: true })
@@ -22,8 +24,13 @@ export class ProcurementNotice {
   @Column({ type: 'text', nullable: true })
   description: string | null;
 
-  @Column({ type: 'varchar', length: 64, nullable: true })
-  status: string | null;
+  @Column({
+    type: 'varchar',
+    length: 64,
+    nullable: false,
+    default: 'PENDING',
+  })
+  status: ProcurementNoticeStatus;
 
   @Column({ name: 'entity_name', type: 'varchar', length: 512, nullable: true })
   entityName: string | null;
@@ -57,4 +64,7 @@ export class ProcurementNotice {
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
+
+  @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz', nullable: true })
+  deletedAt: Date | null;
 }

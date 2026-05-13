@@ -5,9 +5,21 @@ import {
   IsInt,
   Min,
   MaxLength,
+  IsIn,
 } from 'class-validator';
+import {
+  PROCUREMENT_NOTICE_STATUSES,
+  ProcurementNoticeStatus,
+  PROCUREMENT_NOTICE_SORT_FIELDS,
+  PROCUREMENT_NOTICE_SORT_ORDERS,
+} from '../procurement-notice.types';
 
 export class SearchProcurementNoticeDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(512)
+  query?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(512)
@@ -26,7 +38,16 @@ export class SearchProcurementNoticeDto {
   @IsOptional()
   @IsString()
   @MaxLength(64)
-  status?: string;
+  @IsIn(PROCUREMENT_NOTICE_STATUSES)
+  status?: ProcurementNoticeStatus;
+
+  @IsOptional()
+  @IsIn(PROCUREMENT_NOTICE_SORT_FIELDS)
+  sortBy?: (typeof PROCUREMENT_NOTICE_SORT_FIELDS)[number] = 'createdAt';
+
+  @IsOptional()
+  @IsIn(PROCUREMENT_NOTICE_SORT_ORDERS)
+  order?: (typeof PROCUREMENT_NOTICE_SORT_ORDERS)[number] = 'DESC';
 
   @IsOptional()
   @IsString()

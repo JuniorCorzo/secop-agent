@@ -5,7 +5,14 @@ import {
   IsDateString,
   MaxLength,
   Length,
+  IsObject,
+  IsIn,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  PROCUREMENT_NOTICE_STATUSES,
+  ProcurementNoticeStatus,
+} from '../procurement-notice.types';
 
 export class CreateProcurementNoticeDto {
   @IsString()
@@ -23,7 +30,8 @@ export class CreateProcurementNoticeDto {
   @IsOptional()
   @IsString()
   @MaxLength(64)
-  status?: string;
+  @IsIn(PROCUREMENT_NOTICE_STATUSES)
+  status?: ProcurementNoticeStatus;
 
   @IsOptional()
   @IsString()
@@ -36,6 +44,7 @@ export class CreateProcurementNoticeDto {
 
   @IsOptional()
   @IsNumber()
+  @Type(() => Number)
   value?: number;
 
   @IsOptional()
@@ -62,5 +71,6 @@ export class CreateProcurementNoticeDto {
   location?: string;
 
   @IsOptional()
+  @IsObject()
   sourceMetadata?: Record<string, unknown>;
 }

@@ -10,7 +10,7 @@ export class ProcurementNoticesTable1747120000000 implements MigrationInterface 
         secop_id varchar(64) NOT NULL,
         title varchar(512) NOT NULL,
         description text,
-        status varchar(64),
+        status varchar(64) NOT NULL DEFAULT 'PENDING',
         entity_name varchar(512),
         contact_info text,
         value decimal(18, 2),
@@ -21,7 +21,8 @@ export class ProcurementNoticesTable1747120000000 implements MigrationInterface 
         location varchar(256),
         source_metadata jsonb,
         created_at timestamptz NOT NULL DEFAULT now(),
-        updated_at timestamptz NOT NULL DEFAULT now()
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        deleted_at timestamptz
       )
     `);
 
