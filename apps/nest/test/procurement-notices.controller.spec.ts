@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { BadRequestException } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { BullModule, getQueueToken } from '@nestjs/bullmq';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -149,6 +150,16 @@ describe('ProcurementNoticesController (E2E-style)', () => {
       const result = await controller.update('uuid-1', dto as any);
       expect(result).toEqual(updated);
       expect(service.update).toHaveBeenCalledWith('uuid-1', dto);
+    });
+
+    it('returns 400 when status transition is invalid', async () => {
+      service.update.mockRejectedValue(
+        new BadRequestException('Cannot transition procurement notice from PENDING to AWARDED'),
+      );
+
+      await expect(
+        controller.update('uuid-1', { status: 'AWARDED' } as any),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 

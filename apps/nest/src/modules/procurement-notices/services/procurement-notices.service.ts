@@ -18,6 +18,7 @@ import {
   isProcurementNoticeStatus,
 } from '../procurement-notice.types';
 
+/** Pagination metadata returned with every search response. */
 export interface PaginationMeta {
   page: number;
   limit: number;
@@ -25,11 +26,19 @@ export interface PaginationMeta {
   totalPages: number;
 }
 
+/** Wraps search results with pagination metadata. */
 export interface SearchResult {
   data: ProcurementNotice[];
   meta: PaginationMeta;
 }
 
+/**
+ * Summary of a bulk ingest operation.
+ *
+ * - `created`: records that were newly persisted.
+ * - `duplicates`: records skipped — either within-batch duplicates or already in the DB.
+ * - `invalid`: records missing required fields (`secopId` or `title`).
+ */
 export interface BulkIngestResult {
   created: number;
   duplicates: number;
@@ -38,6 +47,14 @@ export interface BulkIngestResult {
 
 const DEFAULT_STATUS: ProcurementNoticeStatus = 'PENDING';
 
+/**
+ * Core service for procurement notice CRUD, search, lifecycle, and bulk ingestion.
+ *
+ * Uses constructor-injected {@link Repository} and throws NestJS HTTP exceptions
+ * from the service layer so controllers stay thin.
+ *
+ * @see procnotices-spec - All requirements
+ */
 @Injectable()
 export class ProcurementNoticesService {
   constructor(
@@ -45,6 +62,15 @@ export class ProcurementNoticesService {
     private readonly repository: Repository<ProcurementNotice>,
   ) {}
 
+  /**
+   * Creates a single procurement notice.
+   *
+   * Dates are converted from ISO strings to `Date`. Defaults `status` to `PENDING`.
+   *
+   * @throws {ConflictException} If a notice with the same `secopId` already exists.
+   *
+   * @see procnotices-spec - Persisted Procurement Notice Record
+   */
   async create(dto: CreateProcurementNoticeDto): Promise<ProcurementNotice> {
     const entity = this.repository.create({
       ...dto,
@@ -61,6 +87,11 @@ export class ProcurementNoticesService {
     }
   }
 
+  /**
+   * Finds a procurement notice by internal UUID.
+   *
+   * @throws {NotFoundException} If no non-deleted record matches the ID.
+   */
   async findOne(id: string): Promise<ProcurementNotice> {
     const entity = await this.repository.findOne({ where: { id } });
     if (!entity) {
@@ -69,6 +100,11 @@ export class ProcurementNoticesService {
     return entity;
   }
 
+  /**
+   * Finds a procurement notice by its stable SECOP identifier.
+   *
+   * @throws {NotFoundException} If no record matches the `secopId`.
+   */
   async findBySecopId(secopId: string): Promise<ProcurementNotice> {
     const entity = await this.repository.findOne({ where: { secopId } });
     if (!entity) {
@@ -77,8 +113,26 @@ export class ProcurementNoticesService {
     return entity;
   }
 
+  /**
+   * Partially updates a procurement notice.
+   *
+   * Only provided fields are merged. If `status` is included, the transition
+   * is validated via {@link canTransitionProcurementNoticeStatus}.
+   *
+   * @throws {NotFoundException} If the record doesn't exist.
+   * @throws {BadRequestException} If the status transition is invalid.
+   *
+   * @see procnotices-spec - CRUD Access
+   */
   async update(id: string, dto: UpdateProcurementNoticeDto): Promise<ProcurementNotice> {
     const entity = await this.findOne(id);
+
+    if (dto.status && !canTransitionProcurementNoticeStatus(entity.status, dto.status)) {
+      throw new BadRequestException(
+        `Cannot transition procurement notice from ${entity.status ?? 'PENDING'} to ${dto.status}`,
+      );
+    }
+
     const updated = this.repository.merge(entity, {
       ...dto,
       status: dto.status ?? entity.status ?? DEFAULT_STATUS,
@@ -88,21 +142,55 @@ export class ProcurementNoticesService {
     return this.repository.save(updated);
   }
 
+  /**
+   * Soft-deletes a procurement notice. Sets `deletedAt` without removing the row.
+   *
+   * @throws {NotFoundException} If the record doesn't exist or is already deleted.
+   */
   async remove(id: string): Promise<void> {
-    const entity = await this.findOne(id);
-    await this.repository.softRemove(entity);
+    const result = await this.repository.softDelete(id);
+    if (!result.affected) {
+      throw new NotFoundException('Procurement notice not found');
+    }
   }
 
+  /**
+   * Searches and lists procurement notices — delegates to {@link findAll}.
+   *
+   * @deprecated Use {@link findAll} directly. Kept for backward compatibility.
+   */
   async search(dto: SearchProcurementNoticeDto): Promise<SearchResult> {
     return this.findAll(dto);
   }
 
+  /**
+   * Lists procurement notices with optional filters, text search, ordering, and pagination.
+   *
+   * Uses `createQueryBuilder` with conditional `andWhere` clauses to avoid N+1.
+   * Sort columns are mapped through a static `COLUMN_MAP` to prevent SQL injection.
+   *
+   * @param dto - Validated search parameters.
+   * @returns Paginated results with metadata.
+   *
+   * @see procnotices-spec - Search and Pagination
+   */
   async findAll(dto: SearchProcurementNoticeDto): Promise<SearchResult> {
     const page = dto.page ?? 1;
     const limit = dto.limit ?? 20;
     const skip = (page - 1) * limit;
     const sortBy = dto.sortBy ?? 'createdAt';
     const order = dto.order ?? 'DESC';
+
+    // Static column map prevents SQL injection through dynamic column names
+    const COLUMN_MAP: Record<ProcurementNoticeSortBy, string> = {
+      createdAt: 'notice.createdAt',
+      updatedAt: 'notice.updatedAt',
+      publicationDate: 'notice.publicationDate',
+      deadlineDate: 'notice.deadlineDate',
+      title: 'notice.title',
+      status: 'notice.status',
+    };
+    const sortColumn = COLUMN_MAP[sortBy as ProcurementNoticeSortBy] ?? COLUMN_MAP.createdAt;
 
     const qb = this.repository.createQueryBuilder('notice');
 
@@ -138,7 +226,7 @@ export class ProcurementNoticesService {
     }
 
     const [data, total] = await qb
-      .orderBy(`notice.${sortBy as ProcurementNoticeSortBy}`, order as ProcurementNoticeSortOrder)
+      .orderBy(sortColumn, order as ProcurementNoticeSortOrder)
       .skip(skip)
       .take(limit)
       .getManyAndCount();
@@ -154,6 +242,19 @@ export class ProcurementNoticesService {
     };
   }
 
+  /**
+   * Advances a procurement notice to a new lifecycle state.
+   *
+   * Validates the transition against {@link canTransitionProcurementNoticeStatus}.
+   * Self-transitions and invalid paths are rejected.
+   *
+   * @param id - Internal UUID of the notice.
+   * @param targetStatus - Desired target lifecycle state.
+   * @throws {NotFoundException} If the notice doesn't exist.
+   * @throws {BadRequestException} If the transition is not allowed.
+   *
+   * @see procnotices-spec - Lifecycle Progression
+   */
   async transitionLifecycle(
     id: string,
     targetStatus: ProcurementNoticeStatus,
@@ -171,6 +272,19 @@ export class ProcurementNoticesService {
     return this.repository.save(entity);
   }
 
+  /**
+   * Ingests a batch of procurement notices, handling deduplication and validation.
+   *
+   * Processing steps:
+   * 1. Deduplicate within the batch by `secopId` (first occurrence wins).
+   * 2. Filter out invalid records (missing `secopId` or `title`).
+   * 3. Query existing `secopId` values from the DB to avoid re-insertion.
+   * 4. Upsert remaining records in chunks of 50 using `repository.upsert`.
+   *
+   * @returns Summary with `created`, `duplicates`, and `invalid` counts.
+   *
+   * @see procnotices-spec - Duplicate-safe Bulk Ingest
+   */
   async bulkIngest(records: CreateProcurementNoticeDto[]): Promise<BulkIngestResult> {
     const deduplicated = new Map<string, CreateProcurementNoticeDto>();
     let duplicates = 0;
@@ -183,16 +297,23 @@ export class ProcurementNoticesService {
     }
 
     const uniqueRecords = Array.from(deduplicated.values());
+
+    // Filter invalid records before DB operations
+    const validRecords = uniqueRecords.filter(
+      (record) => record.secopId && record.title,
+    );
+    const invalidCount = uniqueRecords.length - validRecords.length;
+
     const existingEntities =
-      uniqueRecords.length > 0
+      validRecords.length > 0
         ? await this.repository.find({
-            where: uniqueRecords.map((record) => ({ secopId: record.secopId })),
+            where: validRecords.map((record) => ({ secopId: record.secopId })),
             select: ['secopId'],
           })
         : [];
     const existingSet = new Set(existingEntities.map((entity) => entity.secopId));
 
-    const entities = uniqueRecords.map((dto) => ({
+    const entities = validRecords.map((dto) => ({
       ...dto,
       status: dto.status ?? DEFAULT_STATUS,
       publicationDate: dto.publicationDate ? new Date(dto.publicationDate) : null,
@@ -212,23 +333,30 @@ export class ProcurementNoticesService {
     }
 
     return {
-      created: uniqueRecords.filter((record) => !existingSet.has(record.secopId)).length,
+      created: validRecords.filter((record) => !existingSet.has(record.secopId)).length,
       duplicates: duplicates + existingSet.size,
-      invalid: 0,
+      invalid: invalidCount,
     };
   }
 
+  /**
+   * Extracts the PostgreSQL error from a caught exception and throws
+   * {@link ConflictException} if it's a unique-constraint violation (`23505`).
+   *
+   * Handles both raw PG errors and TypeORM's {@link QueryFailedError} wrapper.
+   */
   private throwConflictIfDuplicate(error: unknown): void {
-    const code = this.extractErrorCode(error);
-    if (code === '23505') {
-      throw new ConflictException('Procurement notice already exists for that SECOP identifier');
-    }
-
-    if (error instanceof QueryFailedError && this.extractErrorCode(error.driverError) === '23505') {
+    const pgError = error instanceof QueryFailedError ? error.driverError : error;
+    if (this.extractErrorCode(pgError) === '23505') {
       throw new ConflictException('Procurement notice already exists for that SECOP identifier');
     }
   }
 
+  /**
+   * Safely extracts a PostgreSQL error code string from any error shape.
+   *
+   * @returns The PG error code (e.g., `'23505'`) or `undefined` if not present.
+   */
   private extractErrorCode(error: unknown): string | undefined {
     if (!error || typeof error !== 'object') {
       return undefined;

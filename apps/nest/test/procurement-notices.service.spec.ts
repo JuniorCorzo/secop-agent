@@ -14,9 +14,11 @@ describe('ProcurementNoticesService', () => {
         create: jest.fn((data) => data as ProcurementNotice),
         save: jest.fn(async (entity) => ({ ...entity, id: 'uuid-1', createdAt: new Date(), updatedAt: new Date() } as ProcurementNotice)),
         findOne: jest.fn(),
+        find: jest.fn(),
+        upsert: jest.fn(),
         merge: jest.fn((entity, update) => ({ ...entity, ...update })),
+        softDelete: jest.fn(),
         remove: jest.fn(async () => undefined),
-        softRemove: jest.fn(async (entity) => entity),
         createQueryBuilder: jest.fn(() => queryBuilderMock()),
       };
 
@@ -151,16 +153,16 @@ describe('ProcurementNoticesService', () => {
   });
 
   describe('remove', () => {
-    it('removes the entity', async () => {
-      const existing = { id: 'uuid-1' } as ProcurementNotice;
-      repository.findOne.mockResolvedValue(existing);
+    it('removes the entity via softDelete', async () => {
+      repository.softDelete.mockResolvedValue({ affected: 1 });
 
       await service.remove('uuid-1');
-      expect(repository.softRemove).toHaveBeenCalledWith(existing);
+      expect(repository.softDelete).toHaveBeenCalledWith('uuid-1');
     });
 
     it('throws NotFoundException when entity missing', async () => {
-      repository.findOne.mockResolvedValue(null);
+      repository.softDelete.mockResolvedValue({ affected: 0 });
+
       await expect(service.remove('missing')).rejects.toBeInstanceOf(NotFoundException);
     });
   });
@@ -289,6 +291,74 @@ describe('ProcurementNoticesService', () => {
       repository.findOne.mockResolvedValue(existing);
 
       await expect(service.transitionLifecycle('uuid-1', 'AWARDED')).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('bulkIngest', () => {
+    it('creates new records and counts correctly', async () => {
+      repository.find.mockResolvedValue([]);
+      repository.upsert.mockResolvedValue({ identifiers: [{ id: 'uuid-1' }, { id: 'uuid-2' }] });
+
+      const records = [
+        { secopId: 'SECOP-001', title: 'Notice 1' },
+        { secopId: 'SECOP-002', title: 'Notice 2' },
+      ] as CreateProcurementNoticeDto[];
+
+      const result = await service.bulkIngest(records);
+
+      expect(result.created).toBe(2);
+      expect(result.duplicates).toBe(0);
+      expect(result.invalid).toBe(0);
+      expect(repository.upsert).toHaveBeenCalled();
+    });
+
+    it('deduplicates records with same secopId within the batch', async () => {
+      repository.find.mockResolvedValue([]);
+      repository.upsert.mockResolvedValue({ identifiers: [{ id: 'uuid-1' }] });
+
+      const records = [
+        { secopId: 'SECOP-001', title: 'Notice 1' },
+        { secopId: 'SECOP-001', title: 'Notice 1 Duplicate' },
+      ] as CreateProcurementNoticeDto[];
+
+      const result = await service.bulkIngest(records);
+
+      expect(result.created).toBe(1);
+      expect(result.duplicates).toBe(1);
+      expect(result.invalid).toBe(0);
+    });
+
+    it('counts already-existing records as duplicates', async () => {
+      repository.find.mockResolvedValue([{ secopId: 'SECOP-001' } as ProcurementNotice]);
+      repository.upsert.mockResolvedValue({ identifiers: [{ id: 'uuid-2' }] });
+
+      const records = [
+        { secopId: 'SECOP-001', title: 'Already Exists' },
+        { secopId: 'SECOP-002', title: 'New Notice' },
+      ] as CreateProcurementNoticeDto[];
+
+      const result = await service.bulkIngest(records);
+
+      expect(result.created).toBe(1);
+      expect(result.duplicates).toBe(1);
+      expect(result.invalid).toBe(0);
+    });
+
+    it('reports invalid records missing secopId or title', async () => {
+      repository.find.mockResolvedValue([]);
+      repository.upsert.mockResolvedValue({ identifiers: [] });
+
+      const records = [
+        { secopId: '', title: 'No Secop' },
+        { secopId: 'SECOP-001', title: '' },
+        { secopId: 'SECOP-002', title: 'Valid Notice' },
+      ] as CreateProcurementNoticeDto[];
+
+      const result = await service.bulkIngest(records);
+
+      expect(result.created).toBe(1);
+      expect(result.duplicates).toBe(0);
+      expect(result.invalid).toBe(2);
     });
   });
 });
