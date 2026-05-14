@@ -1,5 +1,7 @@
 # AGENTS.md — secop-agent
 
+> ⚠️ **Conventions**: All development MUST follow SOLID, YAGNI, and KISS. See [CONVENTIONS.md](./CONVENTIONS.md) for the full breakdown.
+
 ## Stack
 
 | Layer | Tech |
