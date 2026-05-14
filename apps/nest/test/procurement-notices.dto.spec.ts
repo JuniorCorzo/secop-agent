@@ -4,13 +4,14 @@ import { CreateProcurementNoticeDto } from '../src/modules/procurement-notices/d
 import { UpdateProcurementNoticeDto } from '../src/modules/procurement-notices/dto/update-procurement-notice.dto';
 import { BulkIngestionDto } from '../src/modules/procurement-notices/dto/bulk-ingestion.dto';
 import { SearchProcurementNoticeDto } from '../src/modules/procurement-notices/dto/search-procurement-notice.dto';
+import { LifecycleTransitionDto } from '../src/modules/procurement-notices/dto/lifecycle-transition.dto';
 
 function createValidRecord(): CreateProcurementNoticeDto {
   return {
     secopId: 'SECOP-123',
     title: 'Test Notice',
     description: 'A description',
-    status: 'active',
+    status: 'PENDING',
     entityName: 'Test Entity',
     contactInfo: 'contact@test.com',
     value: 1000000,
@@ -102,6 +103,16 @@ describe('CreateProcurementNoticeDto', () => {
     });
     const errors = await validate(dto);
     expect(errors.some((e) => e.property === 'currency')).toBe(true);
+  });
+
+  it('rejects invalid status values', async () => {
+    const dto = plainToInstance(CreateProcurementNoticeDto, {
+      secopId: 'SECOP-001',
+      title: 'Status',
+      status: 'UNKNOWN',
+    });
+    const errors = await validate(dto);
+    expect(errors.some((e) => e.property === 'status')).toBe(true);
   });
 });
 
@@ -200,7 +211,7 @@ describe('SearchProcurementNoticeDto', () => {
       title: 'Software',
       secopId: 'SECOP-001',
       entityName: 'Ministry',
-      status: 'active',
+      status: 'PENDING',
       sector: 'IT',
       location: 'Bogotá',
       page: 2,
@@ -230,5 +241,31 @@ describe('SearchProcurementNoticeDto', () => {
     });
     const errors = await validate(dto);
     expect(errors.some((e) => e.property === 'title')).toBe(true);
+  });
+
+  it('accepts default ordering fields', async () => {
+    const dto = plainToInstance(SearchProcurementNoticeDto, {
+      sortBy: 'updatedAt',
+      order: 'ASC',
+      query: 'tech',
+    });
+    const errors = await validate(dto);
+    expect(errors).toHaveLength(0);
+    expect(dto.sortBy).toBe('updatedAt');
+    expect(dto.order).toBe('ASC');
+  });
+});
+
+describe('LifecycleTransitionDto', () => {
+  it('accepts valid target status', async () => {
+    const dto = plainToInstance(LifecycleTransitionDto, { targetStatus: 'SCORING' });
+    const errors = await validate(dto);
+    expect(errors).toHaveLength(0);
+  });
+
+  it('rejects invalid target status', async () => {
+    const dto = plainToInstance(LifecycleTransitionDto, { targetStatus: 'INVALID' });
+    const errors = await validate(dto);
+    expect(errors.some((e) => e.property === 'targetStatus')).toBe(true);
   });
 });

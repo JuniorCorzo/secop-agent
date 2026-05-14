@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { BadRequestException } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { BullModule, getQueueToken } from '@nestjs/bullmq';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -45,9 +46,12 @@ describe('ProcurementNoticesController (E2E-style)', () => {
           useValue: {
             create: jest.fn(),
             findOne: jest.fn(),
+            findBySecopId: jest.fn(),
             update: jest.fn(),
             remove: jest.fn(),
             search: jest.fn(),
+            findAll: jest.fn(),
+            transitionLifecycle: jest.fn(),
           },
         },
         {
@@ -118,11 +122,11 @@ describe('ProcurementNoticesController (E2E-style)', () => {
         data: [{ id: 'uuid-1', secopId: 'SECOP-001', title: 'Software License' }] as ProcurementNotice[],
         meta: { page: 1, limit: 10, total: 1, totalPages: 1 },
       };
-      service.search.mockResolvedValue(searchResult as any);
+      service.findAll.mockResolvedValue(searchResult as any);
 
       const result = await controller.search(dto as any);
       expect(result).toEqual(searchResult);
-      expect(service.search).toHaveBeenCalledWith(dto);
+      expect(service.findAll).toHaveBeenCalledWith(dto);
     });
   });
 
@@ -147,6 +151,16 @@ describe('ProcurementNoticesController (E2E-style)', () => {
       expect(result).toEqual(updated);
       expect(service.update).toHaveBeenCalledWith('uuid-1', dto);
     });
+
+    it('returns 400 when status transition is invalid', async () => {
+      service.update.mockRejectedValue(
+        new BadRequestException('Cannot transition procurement notice from PENDING to AWARDED'),
+      );
+
+      await expect(
+        controller.update('uuid-1', { status: 'AWARDED' } as any),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
   });
 
   describe('DELETE /procurement-notices/:id', () => {
@@ -155,6 +169,18 @@ describe('ProcurementNoticesController (E2E-style)', () => {
 
       await controller.remove('uuid-1');
       expect(service.remove).toHaveBeenCalledWith('uuid-1');
+    });
+  });
+
+  describe('PATCH /procurement-notices/:id/lifecycle', () => {
+    it('transitions lifecycle state', async () => {
+      const dto = { targetStatus: 'ENRICHING' };
+      const updated = { id: 'uuid-1', secopId: 'SECOP-001', status: 'ENRICHING' } as ProcurementNotice;
+      service.transitionLifecycle.mockResolvedValue(updated as never);
+
+      const result = await controller.transitionLifecycle('uuid-1', dto as any);
+      expect(result).toEqual(updated);
+      expect(service.transitionLifecycle).toHaveBeenCalledWith('uuid-1', 'ENRICHING');
     });
   });
 

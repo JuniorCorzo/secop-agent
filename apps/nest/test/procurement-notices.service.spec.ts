@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { ProcurementNoticesService } from '../src/modules/procurement-notices/services/procurement-notices.service';
 import { ProcurementNotice } from '../src/modules/procurement-notices/entities/procurement-notice.entity';
 import { CreateProcurementNoticeDto } from '../src/modules/procurement-notices/dto/create-procurement-notice.dto';
@@ -10,14 +10,17 @@ describe('ProcurementNoticesService', () => {
   let repository: jest.Mocked<any>;
 
   beforeEach(() => {
-    repository = {
-      create: jest.fn((data) => data as ProcurementNotice),
-      save: jest.fn(async (entity) => ({ ...entity, id: 'uuid-1', createdAt: new Date(), updatedAt: new Date() } as ProcurementNotice)),
-      findOne: jest.fn(),
-      merge: jest.fn((entity, update) => ({ ...entity, ...update })),
-      remove: jest.fn(async () => undefined),
-      createQueryBuilder: jest.fn(() => queryBuilderMock()),
-    };
+      repository = {
+        create: jest.fn((data) => data as ProcurementNotice),
+        save: jest.fn(async (entity) => ({ ...entity, id: 'uuid-1', createdAt: new Date(), updatedAt: new Date() } as ProcurementNotice)),
+        findOne: jest.fn(),
+        find: jest.fn(),
+        upsert: jest.fn(),
+        merge: jest.fn((entity, update) => ({ ...entity, ...update })),
+        softDelete: jest.fn(),
+        remove: jest.fn(async () => undefined),
+        createQueryBuilder: jest.fn(() => queryBuilderMock()),
+      };
 
     service = new ProcurementNoticesService(repository);
   });
@@ -38,7 +41,7 @@ describe('ProcurementNoticesService', () => {
       secopId: 'SECOP-001',
       title: 'Test Notice',
       description: 'Desc',
-      status: 'active',
+      status: 'PENDING',
       entityName: 'Entity',
       contactInfo: 'contact@test.com',
       value: 500000,
@@ -78,6 +81,12 @@ describe('ProcurementNoticesService', () => {
           deadlineDate: undefined,
         }),
       );
+    });
+
+    it('rejects duplicate secopId as ConflictException', async () => {
+      repository.save.mockRejectedValueOnce(Object.assign(new Error('duplicate key'), { code: '23505' }));
+
+      await expect(service.create(createDto())).rejects.toBeInstanceOf(ConflictException);
     });
   });
 
@@ -144,17 +153,34 @@ describe('ProcurementNoticesService', () => {
   });
 
   describe('remove', () => {
-    it('removes the entity', async () => {
-      const existing = { id: 'uuid-1' } as ProcurementNotice;
-      repository.findOne.mockResolvedValue(existing);
+    it('removes the entity via softDelete', async () => {
+      repository.softDelete.mockResolvedValue({ affected: 1 });
 
       await service.remove('uuid-1');
-      expect(repository.remove).toHaveBeenCalledWith(existing);
+      expect(repository.softDelete).toHaveBeenCalledWith('uuid-1');
     });
 
     it('throws NotFoundException when entity missing', async () => {
-      repository.findOne.mockResolvedValue(null);
+      repository.softDelete.mockResolvedValue({ affected: 0 });
+
       await expect(service.remove('missing')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('findBySecopId', () => {
+    it('returns the entity when found', async () => {
+      const entity = { id: 'uuid-1', secopId: 'SECOP-001', title: 'Found' } as ProcurementNotice;
+      repository.findOne.mockResolvedValue(entity);
+
+      const result = await service.findBySecopId('SECOP-001');
+      expect(result).toEqual(entity);
+      expect(repository.findOne).toHaveBeenCalledWith({ where: { secopId: 'SECOP-001' } });
+    });
+
+    it('throws NotFoundException when not found', async () => {
+      repository.findOne.mockResolvedValue(null);
+
+      await expect(service.findBySecopId('missing')).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
@@ -196,10 +222,10 @@ describe('ProcurementNoticesService', () => {
       const qb = queryBuilderMock();
       repository.createQueryBuilder.mockReturnValue(qb);
 
-      await service.search({ entityName: 'Ministry', status: 'active', sector: 'IT', location: 'Bogotá' });
+      await service.search({ entityName: 'Ministry', status: 'PENDING', sector: 'IT', location: 'Bogotá' });
 
       expect(qb.andWhere).toHaveBeenCalledWith('notice.entityName ILIKE :entityName', { entityName: '%Ministry%' });
-      expect(qb.andWhere).toHaveBeenCalledWith('notice.status = :status', { status: 'active' });
+      expect(qb.andWhere).toHaveBeenCalledWith('notice.status = :status', { status: 'PENDING' });
       expect(qb.andWhere).toHaveBeenCalledWith('notice.sector ILIKE :sector', { sector: '%IT%' });
       expect(qb.andWhere).toHaveBeenCalledWith('notice.location ILIKE :location', { location: '%Bogotá%' });
     });
@@ -234,6 +260,105 @@ describe('ProcurementNoticesService', () => {
       await service.search({});
 
       expect(qb.orderBy).toHaveBeenCalledWith('notice.createdAt', 'DESC');
+    });
+
+    it('applies generic text query across searchable fields and custom ordering', async () => {
+      const qb = queryBuilderMock();
+      repository.createQueryBuilder.mockReturnValue(qb);
+
+      await service.search({ query: 'tech', sortBy: 'publicationDate', order: 'ASC' });
+
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        expect.stringContaining('notice.title ILIKE :query'),
+        { query: '%tech%' },
+      );
+      expect(qb.orderBy).toHaveBeenCalledWith('notice.publicationDate', 'ASC');
+    });
+  });
+
+  describe('transitionLifecycle', () => {
+    it('advances lifecycle when transition is valid', async () => {
+      const existing = { id: 'uuid-1', secopId: 'SECOP-001', title: 'Old', status: 'PENDING' } as ProcurementNotice;
+      repository.findOne.mockResolvedValue(existing);
+
+      await service.transitionLifecycle('uuid-1', 'ENRICHING');
+
+      expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({ status: 'ENRICHING' }));
+    });
+
+    it('rejects invalid transition', async () => {
+      const existing = { id: 'uuid-1', secopId: 'SECOP-001', title: 'Old', status: 'PENDING' } as ProcurementNotice;
+      repository.findOne.mockResolvedValue(existing);
+
+      await expect(service.transitionLifecycle('uuid-1', 'AWARDED')).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('bulkIngest', () => {
+    it('creates new records and counts correctly', async () => {
+      repository.find.mockResolvedValue([]);
+      repository.upsert.mockResolvedValue({ identifiers: [{ id: 'uuid-1' }, { id: 'uuid-2' }] });
+
+      const records = [
+        { secopId: 'SECOP-001', title: 'Notice 1' },
+        { secopId: 'SECOP-002', title: 'Notice 2' },
+      ] as CreateProcurementNoticeDto[];
+
+      const result = await service.bulkIngest(records);
+
+      expect(result.created).toBe(2);
+      expect(result.duplicates).toBe(0);
+      expect(result.invalid).toBe(0);
+      expect(repository.upsert).toHaveBeenCalled();
+    });
+
+    it('deduplicates records with same secopId within the batch', async () => {
+      repository.find.mockResolvedValue([]);
+      repository.upsert.mockResolvedValue({ identifiers: [{ id: 'uuid-1' }] });
+
+      const records = [
+        { secopId: 'SECOP-001', title: 'Notice 1' },
+        { secopId: 'SECOP-001', title: 'Notice 1 Duplicate' },
+      ] as CreateProcurementNoticeDto[];
+
+      const result = await service.bulkIngest(records);
+
+      expect(result.created).toBe(1);
+      expect(result.duplicates).toBe(1);
+      expect(result.invalid).toBe(0);
+    });
+
+    it('counts already-existing records as duplicates', async () => {
+      repository.find.mockResolvedValue([{ secopId: 'SECOP-001' } as ProcurementNotice]);
+      repository.upsert.mockResolvedValue({ identifiers: [{ id: 'uuid-2' }] });
+
+      const records = [
+        { secopId: 'SECOP-001', title: 'Already Exists' },
+        { secopId: 'SECOP-002', title: 'New Notice' },
+      ] as CreateProcurementNoticeDto[];
+
+      const result = await service.bulkIngest(records);
+
+      expect(result.created).toBe(1);
+      expect(result.duplicates).toBe(1);
+      expect(result.invalid).toBe(0);
+    });
+
+    it('reports invalid records missing secopId or title', async () => {
+      repository.find.mockResolvedValue([]);
+      repository.upsert.mockResolvedValue({ identifiers: [] });
+
+      const records = [
+        { secopId: '', title: 'No Secop' },
+        { secopId: 'SECOP-001', title: '' },
+        { secopId: 'SECOP-002', title: 'Valid Notice' },
+      ] as CreateProcurementNoticeDto[];
+
+      const result = await service.bulkIngest(records);
+
+      expect(result.created).toBe(1);
+      expect(result.duplicates).toBe(0);
+      expect(result.invalid).toBe(2);
     });
   });
 });
