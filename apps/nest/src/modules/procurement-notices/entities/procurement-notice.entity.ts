@@ -85,6 +85,10 @@ export class ProcurementNotice {
   @Column({ name: 'source_metadata', type: 'jsonb', nullable: true })
   sourceMetadata: Record<string, unknown> | null;
 
+  /** Opaque raw ingestion payload kept for upstream audit fidelity across inserts and upserts. */
+  @Column({ name: 'raw_data', type: 'jsonb', nullable: true })
+  rawData: Record<string, unknown> | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
