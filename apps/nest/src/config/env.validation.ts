@@ -84,6 +84,32 @@ export class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
   HERMES_BASE_URL?: string;
+
+  // SODA Ingestion
+  @IsOptional()
+  @IsString()
+  SODA_API_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  SODA_APP_TOKEN?: string;
+
+  @IsOptional()
+  @IsString()
+  SODA_DATASET_SECOP1?: string;
+
+  @IsOptional()
+  @IsString()
+  SODA_DATASET_SECOP2?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  SODA_PAGE_SIZE?: number;
+
+  @IsOptional()
+  @IsString()
+  SODA_CRON?: string;
 }
 
 export type EnvironmentConfig = Pick<
@@ -108,6 +134,12 @@ export type EnvironmentConfig = Pick<
   | 'LLM_BASE_URL'
   | 'LLM_API_KEY'
   | 'HERMES_BASE_URL'
+  | 'SODA_API_URL'
+  | 'SODA_APP_TOKEN'
+  | 'SODA_DATASET_SECOP1'
+  | 'SODA_DATASET_SECOP2'
+  | 'SODA_PAGE_SIZE'
+  | 'SODA_CRON'
 >;
 
 export const validateEnvironment = (config: Record<string, unknown>): EnvironmentConfig => {
