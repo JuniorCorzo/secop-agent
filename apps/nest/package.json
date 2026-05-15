@@ -17,6 +17,7 @@
     "migration:revert": "bun -r ./scripts/typeorm-stub.ts ./node_modules/typeorm/cli.js migration:revert -d ./src/data-source.ts"
   },
   "dependencies": {
+    "@nestjs/axios": "^4.0.1",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.0",
@@ -25,6 +26,7 @@
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/passport": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/schedule": "^6.1.3",
     "@nestjs/swagger": "^11.0.0",
     "@nestjs/typeorm": "^11.0.0",
     "bcrypt": "^5.1.0",
