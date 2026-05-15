@@ -1,13 +1,14 @@
 # Skill Registry — secop-agent
 
-*Generated: 2026-05-13 | Mode: engram*
+*Generated: 2026-05-14 | Mode: engram | SDD Init: completed*
 
 ## Project Conventions
 
 | File | Purpose |
 |------|---------|
-| `~/.config/opencode/AGENTS.md` | Global agent rules (personality, language, expertise) |
-| `openspec/config.yaml` | SDD project config with stack + testing context |
+| `AGENTS.md` | Project agent rules (stack, commands, gotchas, patterns) |
+| `CONVENTIONS.md` | SOLID/YAGNI/KISS conventions |
+| `openspec/config.yaml` | SDD project config (spec-driven schema) |
 
 ## Available Skills
 
@@ -24,6 +25,10 @@
 | sdd-verify | Validate implementation | opencode |
 | sdd-archive | Archive completed change | opencode |
 | sdd-onboard | Guided SDD walkthrough | claude |
+| openspec-apply-change | Implement OpenSpec change | project |
+| openspec-explore | OpenSpec explore mode | project |
+| openspec-propose | OpenSpec propose change | project |
+| openspec-archive-change | OpenSpec archive change | project |
 
 ### Git & PR
 | Skill | Trigger | Source |
@@ -85,9 +90,16 @@
 | caveman-help | Caveman reference card | claude |
 | skill-creator | Create new agent skills | opencode, claude |
 | find-skills | Discover installable skills | agents |
+| para-memory-files | PARA file-based memory | claude |
+| paperclip | Paperclip coordination | claude |
+| paperclip-create-agent | Create Paperclip agents | claude |
+| paperclip-create-plugin | Create Paperclip plugins | claude |
 
-### Stack-Specific Notes
+## Stack-Specific Notes
+
 - **NestJS backend**: Use `nestjs-best-practices` skill for all backend code
 - **React frontend**: Use `vercel-react-best-practices` + `frontend-design` for UI work
 - **Testing**: Strict TDD enabled — write tests first for NestJS (Jest); frontend has NO test runner yet
 - **Styling**: TailwindCSS 4 — use `tailwind-css-patterns` skill
+- **Package manager**: Bun 1.3 — use `bun` skill for runtime tasks
+- **Build**: FORBIDDEN by convention — never run `bun run build`

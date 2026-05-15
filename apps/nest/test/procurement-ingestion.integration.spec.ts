@@ -1,12 +1,14 @@
 import { Test } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
 import { BullModule, getQueueToken } from '@nestjs/bullmq';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Job } from 'bullmq';
 import { QueuesModule } from '../src/modules/queues/queues.module';
 import { ProcurementIngestionProducer } from '../src/modules/queues/producers/procurement-ingestion.producer';
 import { ProcurementIngestionWorker } from '../src/modules/queues/workers/procurement-ingestion.worker';
 import { QUEUE_NAMES } from '../src/modules/queues/constants/queue-names';
+import { IngestionJob } from '../src/modules/procurement-notices/entities/ingestion-job.entity';
 import { ProcurementNotice } from '../src/modules/procurement-notices/entities/procurement-notice.entity';
 
 describe('Procurement Ingestion Integration', () => {
@@ -23,7 +25,13 @@ describe('Procurement Ingestion Integration', () => {
     };
 
     const upsertMock = jest.fn().mockResolvedValue(undefined);
-    const findMock = jest.fn().mockResolvedValue([]);
+    const findMock = jest
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { id: 'uuid-1', secopId: 'SECOP-001' },
+        { id: 'uuid-2', secopId: 'SECOP-002' },
+      ]);
 
     const moduleRef = await Test.createTestingModule({
       imports: [
@@ -44,6 +52,7 @@ describe('Procurement Ingestion Integration', () => {
             port: 6379,
           },
         }),
+        EventEmitterModule.forRoot(),
         QueuesModule,
       ],
     })
@@ -54,6 +63,10 @@ describe('Procurement Ingestion Integration', () => {
         find: findMock,
         upsert: upsertMock,
       })
+      .overrideProvider(getRepositoryToken(IngestionJob))
+      .useValue({
+        update: jest.fn(),
+      })
       .compile();
 
     const producer = moduleRef.get(ProcurementIngestionProducer);
@@ -61,6 +74,7 @@ describe('Procurement Ingestion Integration', () => {
 
     // 1. Enqueue a valid bulk ingestion job
     const jobData = {
+      ingestionJobId: '11111111-1111-4111-8111-111111111111',
       records: [
         { secopId: 'SECOP-001', title: 'Notice 1' },
         { secopId: 'SECOP-002', title: 'Notice 2' },
@@ -105,7 +119,13 @@ describe('Procurement Ingestion Integration', () => {
     const queueMock = { add: addMock };
 
     const upsertMock = jest.fn().mockResolvedValue(undefined);
-    const findMock = jest.fn().mockResolvedValue([{ secopId: 'SECOP-001' }]);
+    const findMock = jest
+      .fn()
+      .mockResolvedValueOnce([{ secopId: 'SECOP-001' }])
+      .mockResolvedValueOnce([
+        { id: 'uuid-1', secopId: 'SECOP-001' },
+        { id: 'uuid-2', secopId: 'SECOP-002' },
+      ]);
 
     const moduleRef = await Test.createTestingModule({
       imports: [
@@ -126,6 +146,7 @@ describe('Procurement Ingestion Integration', () => {
             port: 6379,
           },
         }),
+        EventEmitterModule.forRoot(),
         QueuesModule,
       ],
     })
@@ -136,6 +157,10 @@ describe('Procurement Ingestion Integration', () => {
         find: findMock,
         upsert: upsertMock,
       })
+      .overrideProvider(getRepositoryToken(IngestionJob))
+      .useValue({
+        update: jest.fn(),
+      })
       .compile();
 
     const worker = moduleRef.get(ProcurementIngestionWorker);
@@ -143,6 +168,7 @@ describe('Procurement Ingestion Integration', () => {
     const job = {
       id: 'job-2',
       data: {
+        ingestionJobId: '22222222-2222-4222-8222-222222222222',
         records: [
           { secopId: 'SECOP-001', title: 'Updated Notice' },
           { secopId: 'SECOP-002', title: 'New Notice' },

@@ -1,13 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { IsArray, ArrayMaxSize, ValidateNested } from 'class-validator';
+import { IsArray, ArrayMaxSize, IsUUID, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { BaseQueueProducer } from './base-queue.producer';
 import { QUEUE_NAMES } from '../constants/queue-names';
 import { CreateProcurementNoticeDto } from '../../procurement-notices/dto/create-procurement-notice.dto';
 
 export class ProcurementIngestionJobData {
+  @IsUUID()
+  ingestionJobId: string;
+
   @IsArray()
   @ArrayMaxSize(1000)
   @ValidateNested({ each: true })

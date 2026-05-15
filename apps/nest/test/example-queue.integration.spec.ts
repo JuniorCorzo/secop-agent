@@ -1,11 +1,13 @@
 import { Test } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
 import { BullModule, getQueueToken } from '@nestjs/bullmq';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Job } from 'bullmq';
 import { QueuesModule } from '../src/modules/queues/queues.module';
 import { ExampleQueueProducer } from '../src/modules/queues/producers/example-queue.producer';
 import { ExampleQueueWorker } from '../src/modules/queues/workers/example-queue.worker';
+import { IngestionJob } from '../src/modules/procurement-notices/entities/ingestion-job.entity';
 import { QUEUE_NAMES } from '../src/modules/queues/constants/queue-names';
 import { ProcurementNotice } from '../src/modules/procurement-notices/entities/procurement-notice.entity';
 
@@ -41,6 +43,7 @@ describe('ExampleQueue Integration', () => {
             port: 6379,
           },
         }),
+        EventEmitterModule.forRoot(),
         QueuesModule,
       ],
     })
@@ -50,6 +53,12 @@ describe('ExampleQueue Integration', () => {
       .useValue({
         find: jest.fn(),
         upsert: jest.fn(),
+      })
+      .overrideProvider(getRepositoryToken(IngestionJob))
+      .useValue({
+        create: jest.fn(),
+        save: jest.fn(),
+        update: jest.fn(),
       })
       .compile();
 

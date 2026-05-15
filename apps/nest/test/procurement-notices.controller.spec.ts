@@ -103,10 +103,10 @@ describe('ProcurementNoticesController (E2E-style)', () => {
           { secopId: 'SECOP-002', title: 'Notice 2' },
         ],
       };
-      ingestionService.enqueueBulkIngestion.mockResolvedValue({ jobId: 'job-123' });
+      ingestionService.enqueueBulkIngestion.mockResolvedValue({ jobId: 'ingestion-job-123' });
 
       const result = await controller.bulkIngest(dto as any);
-      expect(result).toEqual({ jobId: 'job-123' });
+      expect(result).toEqual({ jobId: 'ingestion-job-123' });
       expect(ingestionService.enqueueBulkIngestion).toHaveBeenCalledWith(dto);
     });
   });

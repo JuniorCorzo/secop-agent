@@ -6,7 +6,9 @@ import { QUEUE_NAMES } from './constants/queue-names';
 import { ExampleQueueProducer } from './producers/example-queue.producer';
 import { ExampleQueueWorker } from './workers/example-queue.worker';
 import { ProcurementIngestionProducer } from './producers/procurement-ingestion.producer';
+import { ScoringDispatchProducer } from './producers/scoring-dispatch.producer';
 import { ProcurementIngestionWorker } from './workers/procurement-ingestion.worker';
+import { IngestionJob } from '../procurement-notices/entities/ingestion-job.entity';
 import { ProcurementNotice } from '../procurement-notices/entities/procurement-notice.entity';
 
 @Module({
@@ -25,15 +27,17 @@ import { ProcurementNotice } from '../procurement-notices/entities/procurement-n
     BullModule.registerQueue(
       { name: QUEUE_NAMES.EXAMPLE },
       { name: QUEUE_NAMES.PROCUREMENT_NOTICE_INGESTION },
+      { name: QUEUE_NAMES.SCORING },
     ),
-    TypeOrmModule.forFeature([ProcurementNotice]),
+    TypeOrmModule.forFeature([ProcurementNotice, IngestionJob]),
   ],
   providers: [
     ExampleQueueProducer,
     ExampleQueueWorker,
     ProcurementIngestionProducer,
+    ScoringDispatchProducer,
     ProcurementIngestionWorker,
   ],
-  exports: [BullModule, ExampleQueueProducer, ProcurementIngestionProducer],
+  exports: [BullModule, ExampleQueueProducer, ProcurementIngestionProducer, ScoringDispatchProducer],
 })
 export class QueuesModule {}
