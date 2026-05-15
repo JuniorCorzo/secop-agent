@@ -1,9 +1,15 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Job } from 'bullmq';
 import { QUEUE_NAMES } from '../constants/queue-names';
+import {
+  IngestionJob,
+  IngestionJobStatus,
+} from '../../procurement-notices/entities/ingestion-job.entity';
+import { NewProcurementNoticeEvent } from '../../procurement-notices/events/new-procurement-notice.event';
 import { ProcurementNotice } from '../../procurement-notices/entities/procurement-notice.entity';
 import { ProcurementIngestionJobData } from '../producers/procurement-ingestion.producer';
 
@@ -22,6 +28,9 @@ export class ProcurementIngestionWorker extends WorkerHost {
   constructor(
     @InjectRepository(ProcurementNotice)
     private readonly repository: Repository<ProcurementNotice>,
+    @InjectRepository(IngestionJob)
+    private readonly ingestionJobRepository: Repository<IngestionJob>,
+    private readonly eventEmitter: EventEmitter2,
   ) {
     super();
   }
@@ -37,6 +46,10 @@ export class ProcurementIngestionWorker extends WorkerHost {
       failed: 0,
       errors: [],
     };
+
+    await this.ingestionJobRepository.update(job.data.ingestionJobId, {
+      status: IngestionJobStatus.PROCESSING,
+    });
 
     // Deduplicate by secopId (keep last occurrence)
     const recordMap = new Map<string, ProcurementIngestionJobData['records'][number]>();
@@ -79,11 +92,17 @@ export class ProcurementIngestionWorker extends WorkerHost {
           sector: record.sector ?? null,
           location: record.location ?? null,
           sourceMetadata: record.sourceMetadata ?? null,
+          rawData: record.sourceMetadata ?? null,
         }));
 
         // TypeORM upsert typing is strict about jsonb columns; cast is safe here
         // because the plain object shape matches the entity schema exactly.
         await this.repository.upsert(entities as any, ['secopId']);
+
+        const persistedNotices = await this.repository.find({
+          where: chunk.map((record) => ({ secopId: record.secopId })),
+          select: ['id', 'secopId'],
+        });
 
         for (const record of chunk) {
           if (existingSet.has(record.secopId)) {
@@ -91,6 +110,18 @@ export class ProcurementIngestionWorker extends WorkerHost {
           } else {
             result.created++;
           }
+        }
+
+        for (const notice of persistedNotices) {
+          this.eventEmitter.emit(
+            NewProcurementNoticeEvent.EVENT_NAME,
+            new NewProcurementNoticeEvent({
+              ingestionJobId: job.data.ingestionJobId,
+              procurementNoticeId: notice.id,
+              secopId: notice.secopId,
+              action: existingSet.has(notice.secopId) ? 'updated' : 'created',
+            }),
+          );
         }
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
@@ -103,7 +134,29 @@ export class ProcurementIngestionWorker extends WorkerHost {
           });
         }
       }
+
+      await this.ingestionJobRepository.update(job.data.ingestionJobId, {
+        createdCount: result.created,
+        updatedCount: result.updated,
+        failedCount: result.failed,
+        errors: result.errors,
+      });
     }
+
+    const finalStatus =
+      result.failed === 0
+        ? IngestionJobStatus.COMPLETED
+        : result.created > 0 || result.updated > 0
+          ? IngestionJobStatus.PARTIAL
+          : IngestionJobStatus.FAILED;
+
+    await this.ingestionJobRepository.update(job.data.ingestionJobId, {
+      status: finalStatus,
+      createdCount: result.created,
+      updatedCount: result.updated,
+      failedCount: result.failed,
+      errors: result.errors,
+    });
 
     this.logger.log(
       `Job ${job.id} complete: ${result.created} created, ${result.updated} updated, ${result.failed} failed`,
