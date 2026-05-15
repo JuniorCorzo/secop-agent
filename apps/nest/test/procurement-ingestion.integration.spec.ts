@@ -76,8 +76,8 @@ describe('Procurement Ingestion Integration', () => {
     const jobData = {
       ingestionJobId: '11111111-1111-4111-8111-111111111111',
       records: [
-        { secopId: 'SECOP-001', title: 'Notice 1' },
-        { secopId: 'SECOP-002', title: 'Notice 2' },
+        { secopId: 'SECOP-001', source: 'SECOP_II' as const, title: 'Notice 1' },
+        { secopId: 'SECOP-002', source: 'SECOP_II' as const, title: 'Notice 2' },
       ],
     };
     const enqueued = await producer.add(jobData);

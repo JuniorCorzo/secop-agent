@@ -39,16 +39,17 @@ describe('ProcurementNoticesService', () => {
   function createDto(): CreateProcurementNoticeDto {
     return {
       secopId: 'SECOP-001',
+      source: 'SECOP_II',
       title: 'Test Notice',
       description: 'Desc',
       status: 'PENDING',
       entityName: 'Entity',
-      contactInfo: 'contact@test.com',
+      entityNit: '900123456-1',
       value: 500000,
       currency: 'COP',
       publicationDate: '2024-01-15',
       deadlineDate: '2024-06-30',
-      sector: 'IT',
+      department: 'Cundinamarca',
       location: 'Bogotá',
       sourceMetadata: { raw: true },
     };
@@ -222,11 +223,11 @@ describe('ProcurementNoticesService', () => {
       const qb = queryBuilderMock();
       repository.createQueryBuilder.mockReturnValue(qb);
 
-      await service.search({ entityName: 'Ministry', status: 'PENDING', sector: 'IT', location: 'Bogotá' });
+      await service.search({ entityName: 'Ministry', status: 'PENDING', department: 'Cundinamarca', location: 'Bogotá' });
 
       expect(qb.andWhere).toHaveBeenCalledWith('notice.entityName ILIKE :entityName', { entityName: '%Ministry%' });
       expect(qb.andWhere).toHaveBeenCalledWith('notice.status = :status', { status: 'PENDING' });
-      expect(qb.andWhere).toHaveBeenCalledWith('notice.sector ILIKE :sector', { sector: '%IT%' });
+      expect(qb.andWhere).toHaveBeenCalledWith('notice.department ILIKE :department', { department: '%Cundinamarca%' });
       expect(qb.andWhere).toHaveBeenCalledWith('notice.location ILIKE :location', { location: '%Bogotá%' });
     });
 
