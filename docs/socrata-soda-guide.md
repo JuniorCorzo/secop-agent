@@ -1,9 +1,14 @@
 # Guía de Uso: API Socrata SODA 3.0 — Portal datos.gov.co
 
-> **Dataset de referencia:** SECOP Integrado (`rpmr-utcd`)
+> **Datasets:**
+> | Dataset | ID | URL |
+> |---------|-----|-----|
+> | **SECOP-I** | `f789-7hwg` | `https://www.datos.gov.co/api/v3/views/f789-7hwg/query.json` |
+> | **SECOP-II** | `p6dx-8zbt` | `https://www.datos.gov.co/api/v3/views/p6dx-8zbt/query.json` |
+>
 > **Portal:** https://www.datos.gov.co
 > **Fuente:** Agencia Nacional de Contratación Pública — Colombia Compra Eficiente
-> **Total registros:** ~21.8 millones
+> **Total registros:** ~21.8 millones (combinado)
 > **Plataforma:** Socrata / Tyler Technologies Data & Insights
 > **Versión API:** SODA 3.0 (autenticación requerida)
 
@@ -13,12 +18,21 @@
 
 SODA 3.0 introduce dos endpoints separados: `/query` para consultas programáticas y `/export` para descargas completas.
 
+### SECOP-I (`f789-7hwg`)
+
 | Propósito | URL |
 |-----------|-----|
-| **Query** (JSON) | `POST https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json` |
-| **Export** (CSV) | `POST https://www.datos.gov.co/api/v3/views/rpmr-utcd/export.csv` |
-| **Metadata** | `GET https://www.datos.gov.co/api/views/rpmr-utcd.json` |
-| **Documentación** | `https://dev.socrata.com/foundry/www.datos.gov.co/rpmr-utcd` |
+| **Query** (JSON) | `POST https://www.datos.gov.co/api/v3/views/f789-7hwg/query.json` |
+| **Export** (CSV) | `POST https://www.datos.gov.co/api/v3/views/f789-7hwg/export.csv` |
+| **Metadata** | `GET https://www.datos.gov.co/api/views/f789-7hwg.json` |
+
+### SECOP-II (`p6dx-8zbt`)
+
+| Propósito | URL |
+|-----------|-----|
+| **Query** (JSON) | `POST https://www.datos.gov.co/api/v3/views/p6dx-8zbt/query.json` |
+| **Export** (CSV) | `POST https://www.datos.gov.co/api/v3/views/p6dx-8zbt/export.csv` |
+| **Metadata** | `GET https://www.datos.gov.co/api/views/p6dx-8zbt.json` |
 
 ### Diferencia clave con SODA 2.x
 
@@ -67,7 +81,7 @@ SoQL es un subset de SQL. En SODA 3.0, la query va dentro del JSON body. **Ya no
 ### 3.1 Estructura básica del request
 
 ```bash
-curl -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json" \
+curl -X POST "https://www.datos.gov.co/api/v3/views/f789-7hwg/query.json" \
   -H "Content-Type: application/json" \
   -H "X-App-Token: TU_TOKEN" \
   -d '{
@@ -84,7 +98,7 @@ curl -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json" \
 
 ```bash
 # Todas las columnas de usuario (no incluye system fields)
-curl -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json" \
+curl -X POST "https://www.datos.gov.co/api/v3/views/f789-7hwg/query.json" \
   -H "Content-Type: application/json" \
   -H "X-App-Token: TU_TOKEN" \
   -d '{
@@ -94,7 +108,7 @@ curl -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json" \
   }'
 
 # Columnas específicas
-curl -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json" \
+curl -X POST "https://www.datos.gov.co/api/v3/views/f789-7hwg/query.json" \
   -H "Content-Type: application/json" \
   -H "X-App-Token: TU_TOKEN" \
   -d '{
@@ -103,7 +117,7 @@ curl -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json" \
   }'
 
 # Alias con AS
-curl -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json" \
+curl -X POST "https://www.datos.gov.co/api/v3/views/f789-7hwg/query.json" \
   -H "Content-Type: application/json" \
   -H "X-App-Token: TU_TOKEN" \
   -d '{
@@ -116,7 +130,7 @@ curl -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json" \
 
 ```bash
 # Igualdad exacta (texto entre comillas simples)
-curl -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json" \
+curl -X POST "https://www.datos.gov.co/api/v3/views/f789-7hwg/query.json" \
   -H "Content-Type: application/json" \
   -H "X-App-Token: TU_TOKEN" \
   -d '{
@@ -293,7 +307,7 @@ Para descargas completas (humano-legibles, CSV/Excel):
 
 ```bash
 # Exportar como CSV
-curl -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/export.csv" \
+curl -X POST "https://www.datos.gov.co/api/v3/views/f789-7hwg/export.csv" \
   -H "Content-Type: application/json" \
   -H "X-App-Token: TU_TOKEN" \
   -d '{
@@ -441,7 +455,7 @@ curl -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/export.csv" \
 
 ### 7.1 Contar todos los registros
 ```bash
-curl -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json" \
+curl -X POST "https://www.datos.gov.co/api/v3/views/f789-7hwg/query.json" \
   -H "Content-Type: application/json" \
   -H "X-App-Token: TU_TOKEN" \
   -d '{"query": "SELECT count(*)", "includeSynthetic": false}' | jq
@@ -450,7 +464,7 @@ curl -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json" \
 
 ### 7.2 Top 10 entidades con más contratos
 ```bash
-curl -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json" \
+curl -X POST "https://www.datos.gov.co/api/v3/views/f789-7hwg/query.json" \
   -H "Content-Type: application/json" \
   -H "X-App-Token: TU_TOKEN" \
   -d '{
@@ -462,7 +476,7 @@ curl -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json" \
 
 ### 7.3 Contratos de Medellín en 2023 (usando heredoc para evitar escapes)
 ```bash
-curl -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json" \
+curl -X POST "https://www.datos.gov.co/api/v3/views/f789-7hwg/query.json" \
   -H "Content-Type: application/json" \
   -H "X-App-Token: TU_TOKEN" \
   -d @- <<'EOF'
@@ -475,7 +489,7 @@ EOF
 
 ### 7.4 Suma total contratada por departamento
 ```bash
-curl -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json" \
+curl -X POST "https://www.datos.gov.co/api/v3/views/f789-7hwg/query.json" \
   -H "Content-Type: application/json" \
   -H "X-App-Token: TU_TOKEN" \
   -d @- <<'EOF'
@@ -488,7 +502,7 @@ EOF
 
 ### 7.5 Contratos más grandes (top 20)
 ```bash
-curl -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json" \
+curl -X POST "https://www.datos.gov.co/api/v3/views/f789-7hwg/query.json" \
   -H "Content-Type: application/json" \
   -H "X-App-Token: TU_TOKEN" \
   -d @- <<'EOF'
@@ -501,7 +515,7 @@ EOF
 
 ### 7.6 Contratos de Prestación de Servicios en Antioquia (> $100M)
 ```bash
-curl -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json" \
+curl -X POST "https://www.datos.gov.co/api/v3/views/f789-7hwg/query.json" \
   -H "Content-Type: application/json" \
   -H "X-App-Token: TU_TOKEN" \
   -d @- <<'EOF'
@@ -514,7 +528,7 @@ EOF
 
 ### 7.7 Evolución anual de contratación
 ```bash
-curl -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json" \
+curl -X POST "https://www.datos.gov.co/api/v3/views/f789-7hwg/query.json" \
   -H "Content-Type: application/json" \
   -H "X-App-Token: TU_TOKEN" \
   -d @- <<'EOF'
@@ -527,7 +541,7 @@ EOF
 
 ### 7.8 Export CSV de los contratos de un departamento
 ```bash
-curl -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/export.csv" \
+curl -X POST "https://www.datos.gov.co/api/v3/views/f789-7hwg/export.csv" \
   -H "Content-Type: application/json" \
   -H "X-App-Token: TU_TOKEN" \
   -d '{
@@ -542,7 +556,7 @@ curl -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/export.csv" \
 # usá el endpoint query con paginación y concatená resultados.
 PAGE=1
 while true; do
-  curl -s -X POST "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json" \
+  curl -s -X POST "https://www.datos.gov.co/api/v3/views/f789-7hwg/query.json" \
     -H "Content-Type: application/json" \
     -H "X-App-Token: TU_TOKEN" \
     -d "{\"query\": \"SELECT *\", \"page\": {\"pageNumber\": $PAGE, \"pageSize\": 50000}}" \
@@ -562,7 +576,10 @@ done
 import requests
 import json
 
-BASE_URL = "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json"
+# SECOP-I: f789-7hwg
+# SECOP-II: p6dx-8zbt
+BASE_URL_SECOP1 = "https://www.datos.gov.co/api/v3/views/f789-7hwg/query.json"
+BASE_URL_SECOP2 = "https://www.datos.gov.co/api/v3/views/p6dx-8zbt/query.json"
 APP_TOKEN = "TU_TOKEN"
 
 def query_secop(query: str, page_number=1, page_size=1000, **kwargs):
@@ -637,7 +654,7 @@ def query_to_df(query, page_size=50000):
     page = 1
     while True:
         resp = requests.post(
-            "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json",
+            "https://www.datos.gov.co/api/v3/views/f789-7hwg/query.json",
             headers={"Content-Type": "application/json", "X-App-Token": "TU_TOKEN"},
             json={
                 "query": query,
@@ -672,7 +689,10 @@ print(df.head(20))
 ## 9. Ejemplos en JavaScript/Node.js
 
 ```javascript
-const BASE_URL = "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json";
+// SECOP-I: f789-7hwg
+// SECOP-II: p6dx-8zbt
+const BASE_URL_SECOP1 = "https://www.datos.gov.co/api/v3/views/f789-7hwg/query.json";
+const BASE_URL_SECOP2 = "https://www.datos.gov.co/api/v3/views/p6dx-8zbt/query.json";
 const APP_TOKEN = "TU_TOKEN";
 
 async function querySecop(query, { pageNumber = 1, pageSize = 1000, includeSynthetic = false } = {}) {
@@ -718,8 +738,11 @@ import (
 )
 
 const (
-    baseURL   = "https://www.datos.gov.co/api/v3/views/rpmr-utcd/query.json"
-    appToken  = "TU_TOKEN"
+    // SECOP-I: f789-7hwg
+    // SECOP-II: p6dx-8zbt
+    baseURLSecop1 = "https://www.datos.gov.co/api/v3/views/f789-7hwg/query.json"
+    baseURLSecop2 = "https://www.datos.gov.co/api/v3/views/p6dx-8zbt/query.json"
+    appToken      = "TU_TOKEN"
 )
 
 type QueryRequest struct {
@@ -832,5 +855,5 @@ En SoQL no se usa `FROM` porque la query siempre opera sobre un único dataset (
 - [App Tokens](https://dev.socrata.com/docs/app-tokens.html)
 - [Data Formats](https://dev.socrata.com/docs/formats/)
 - [Response Codes & Headers](https://dev.socrata.com/docs/response-codes)
-- [Dataset SECOP Integrado](https://www.datos.gov.co/Estad-sticas-Nacionales/SECOP-Integrado/rpmr-utcd)
-- [Documentación API del dataset](https://dev.socrata.com/foundry/www.datos.gov.co/rpmr-utcd)
+- [Dataset SECOP-I](https://www.datos.gov.co/resource/f789-7hwg)
+- [Dataset SECOP-II](https://www.datos.gov.co/resource/p6dx-8zbt)

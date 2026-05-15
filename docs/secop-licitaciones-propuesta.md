@@ -1,7 +1,10 @@
 # Propuesta: Datos Relevantes de SECOP para Búsqueda de Licitaciones
 
-> **Dataset:** SECOP Integrado (`rpmr-utcd`)
-> **Registros:** ~21.8 millones de procesos de contratación pública en Colombia
+> **Datasets:**
+> - **SECOP-I** (`f789-7hwg`) — `https://www.datos.gov.co/api/v3/views/f789-7hwg/query.json`
+> - **SECOP-II** (`p6dx-8zbt`) — `https://www.datos.gov.co/api/v3/views/p6dx-8zbt/query.json`
+>
+> **Registros:** ~21.8 millones de procesos de contratación pública en Colombia (combinado)
 > **API:** SODA 3.0 sobre datos.gov.co
 
 ---
@@ -432,8 +435,18 @@ Estas columnas tienen poco o nulo valor para búsqueda de licitaciones:
 
 ## 9. Consideraciones Técnicas
 
+### Dos datasets separados
+SECOP ya no expone un dataset integrado único. Ahora hay dos endpoints independientes:
+
+| Dataset | ID | URL |
+|---------|-----|-----|
+| SECOP-I | `f789-7hwg` | `POST https://www.datos.gov.co/api/v3/views/f789-7hwg/query.json` |
+| SECOP-II | `p6dx-8zbt` | `POST https://www.datos.gov.co/api/v3/views/p6dx-8zbt/query.json` |
+
+El scheduler debe consultar **ambos** en cada ciclo y normalizar los resultados antes de enviarlos al backend.
+
 ### Volumen de datos
-- **21.8M registros** totales. Las queries sin filtrar son inviables.
+- **~21.8M registros** totales combinados. Las queries sin filtrar son inviables.
 - **Estrategia:** Siempre filtrar por `estado_del_proceso` y/o `fecha` primero. Una query con `WHERE estado_del_proceso = 'Convocado'` reduce drásticamente el volumen (~971K registros históricos, pero los activos son muchos menos).
 
 ### Frecuencia de actualización
@@ -457,6 +470,6 @@ Estas columnas tienen poco o nulo valor para búsqueda de licitaciones:
 ## 10. Referencias
 
 - [Guía SODA 3.0 para SECOP](./socrata-soda-guide.md)
-- [Dataset SECOP Integrado](https://www.datos.gov.co/Estad-sticas-Nacionales/SECOP-Integrado/rpmr-utcd)
-- [API Documentation](https://dev.socrata.com/foundry/www.datos.gov.co/rpmr-utcd)
+- [Dataset SECOP-I](https://www.datos.gov.co/resource/f789-7hwg)
+- [Dataset SECOP-II](https://www.datos.gov.co/resource/p6dx-8zbt)
 - [SoQL Functions Reference](https://dev.socrata.com/docs/functions/)
