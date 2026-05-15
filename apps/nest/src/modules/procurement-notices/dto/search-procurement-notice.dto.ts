@@ -3,13 +3,16 @@ import {
   IsOptional,
   IsString,
   IsInt,
+  IsNumber,
   Min,
   MaxLength,
   IsIn,
 } from 'class-validator';
 import {
   PROCUREMENT_NOTICE_STATUSES,
+  PROCUREMENT_NOTICE_SOURCES,
   ProcurementNoticeStatus,
+  ProcurementNoticeSource,
   PROCUREMENT_NOTICE_SORT_FIELDS,
   PROCUREMENT_NOTICE_SORT_ORDERS,
 } from '../procurement-notice.types';
@@ -18,8 +21,9 @@ import {
  * Query DTO for searching and listing procurement notices.
  *
  * All filters are optional. When no filters are provided, all non-deleted records
- * are returned ordered by `createdAt DESC`. Text search (`query`) spans `title`,
- * `secopId`, `entityName`, `sector`, and `location` using ILIKE.
+ * are returned ordered by `createdAt DESC`. Free-text search (`query`) spans
+ * `title`, `secopId`, `entityName`, `unspscName`, `department`, and `location`
+ * using ILIKE.
  *
  * @see procnotices-spec - Search and Pagination
  */
@@ -45,14 +49,72 @@ export class SearchProcurementNoticeDto {
   @MaxLength(512)
   entityName?: string;
 
-  /**
-   * Filter by exact lifecycle status. Invalid values are rejected by `class-validator`.
-   */
+  /** Filter by NIT of the contracting entity. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  entityNit?: string;
+
+  /** Filter by exact lifecycle status. */
   @IsOptional()
   @IsString()
   @MaxLength(64)
   @IsIn(PROCUREMENT_NOTICE_STATUSES)
   status?: ProcurementNoticeStatus;
+
+  /** Filter by source dataset. */
+  @IsOptional()
+  @IsString()
+  @IsIn(PROCUREMENT_NOTICE_SOURCES)
+  source?: ProcurementNoticeSource;
+
+  /** Filter by contracting modality (e.g., Licitación Pública). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(256)
+  contractingModality?: string;
+
+  /** Filter by contract type (e.g., Obra, Suministro). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  contractType?: string;
+
+  /** Filter by UNSPSC code. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  unspscCode?: string;
+
+  /** Filter by department (geographic). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  department?: string;
+
+  /** Filter by city/municipality. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(256)
+  location?: string;
+
+  /** Filter by NIT of the awarded contractor. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  awardedContractorNit?: string;
+
+  /** Minimum contract value filter. */
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  minValue?: number;
+
+  /** Maximum contract value filter. */
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  maxValue?: number;
 
   /** Sort column. Defaults to `createdAt`. */
   @IsOptional()
@@ -63,16 +125,6 @@ export class SearchProcurementNoticeDto {
   @IsOptional()
   @IsIn(PROCUREMENT_NOTICE_SORT_ORDERS)
   order?: (typeof PROCUREMENT_NOTICE_SORT_ORDERS)[number] = 'DESC';
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(256)
-  sector?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(256)
-  location?: string;
 
   /** Page number (1-based). Defaults to 1. */
   @IsOptional()

@@ -1,4 +1,12 @@
 /**
+ * Origin dataset for a procurement notice.
+ * SECOP_I = awarded/signed contracts (historical intelligence, f789-7hwg).
+ * SECOP_II = active procurement processes (opportunity pipeline, p6dx-8zbt).
+ */
+export const PROCUREMENT_NOTICE_SOURCES = ['SECOP_I', 'SECOP_II'] as const;
+export type ProcurementNoticeSource = (typeof PROCUREMENT_NOTICE_SOURCES)[number];
+
+/**
  * Valid lifecycle states for a procurement notice.
  *
  * Lifecycle progression:
@@ -27,6 +35,9 @@ export const PROCUREMENT_NOTICE_SORT_FIELDS = [
   'updatedAt',
   'publicationDate',
   'deadlineDate',
+  'awardedDate',
+  'value',
+  'awardedValue',
   'title',
   'status',
 ] as const;
