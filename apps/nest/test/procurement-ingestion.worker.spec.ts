@@ -1,9 +1,13 @@
 import { Job } from 'bullmq';
 import { ProcurementIngestionWorker, IngestionJobResult } from '../src/modules/queues/workers/procurement-ingestion.worker';
+import { IngestionJobStatus } from '../src/modules/procurement-notices/entities/ingestion-job.entity';
+import { NewProcurementNoticeEvent } from '../src/modules/procurement-notices/events/new-procurement-notice.event';
 
 describe('ProcurementIngestionWorker', () => {
   let worker: ProcurementIngestionWorker;
   let repository: jest.Mocked<any>;
+  let ingestionJobRepository: jest.Mocked<any>;
+  let eventEmitter: jest.Mocked<any>;
 
   beforeEach(() => {
     repository = {
@@ -11,13 +15,21 @@ describe('ProcurementIngestionWorker', () => {
       upsert: jest.fn().mockResolvedValue(undefined),
     };
 
-    worker = new ProcurementIngestionWorker(repository);
+    ingestionJobRepository = {
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+
+    eventEmitter = {
+      emit: jest.fn(),
+    };
+
+    worker = new ProcurementIngestionWorker(repository, ingestionJobRepository, eventEmitter);
   });
 
   function makeJob(records: Array<{ secopId: string; title: string }>): Job<any> {
     return {
       id: 'job-123',
-      data: { records },
+      data: { ingestionJobId: 'ingestion-job-123', records },
     } as Job;
   }
 
@@ -32,6 +44,11 @@ describe('ProcurementIngestionWorker', () => {
     it('processes 150 records in 3 chunks of 50', async () => {
       const records = makeRecords(150);
       const job = makeJob(records);
+      repository.find
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce(records.slice(0, 50).map((record, index) => ({ id: `uuid-${index}`, secopId: record.secopId })))
+        .mockResolvedValueOnce(records.slice(50, 100).map((record, index) => ({ id: `uuid-${index + 50}`, secopId: record.secopId })))
+        .mockResolvedValueOnce(records.slice(100, 150).map((record, index) => ({ id: `uuid-${index + 100}`, secopId: record.secopId })));
 
       const result = await worker.process(job);
 
@@ -54,6 +71,9 @@ describe('ProcurementIngestionWorker', () => {
       expect(result.created).toBe(150);
       expect(result.updated).toBe(0);
       expect(result.failed).toBe(0);
+      expect(ingestionJobRepository.update).toHaveBeenCalledWith('ingestion-job-123', {
+        status: IngestionJobStatus.PROCESSING,
+      });
     });
 
     it('processes a single record in one chunk', async () => {
@@ -100,6 +120,12 @@ describe('ProcurementIngestionWorker', () => {
         { secopId: 'SECOP-UNIQUE', title: 'Unique' },
       ];
       const job = makeJob(records);
+      repository.find
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          { id: 'uuid-1', secopId: 'SECOP-DUP' },
+          { id: 'uuid-2', secopId: 'SECOP-UNIQUE' },
+        ]);
 
       const result = await worker.process(job);
 
@@ -117,10 +143,14 @@ describe('ProcurementIngestionWorker', () => {
 
   describe('created vs updated counts', () => {
     it('counts existing records as updated', async () => {
-      repository.find.mockResolvedValue([
-        { secopId: 'SECOP-0' },
-        { secopId: 'SECOP-2' },
-      ]);
+      repository.find
+        .mockResolvedValueOnce([
+          { secopId: 'SECOP-0' },
+          { secopId: 'SECOP-2' },
+        ])
+        .mockResolvedValueOnce(
+          makeRecords(5).map((record, index) => ({ id: `uuid-${index}`, secopId: record.secopId })),
+        );
 
       const records = makeRecords(5);
       const job = makeJob(records);
@@ -133,7 +163,9 @@ describe('ProcurementIngestionWorker', () => {
     });
 
     it('counts all new records as created when none exist', async () => {
-      repository.find.mockResolvedValue([]);
+      repository.find.mockResolvedValueOnce([]).mockResolvedValueOnce(
+        makeRecords(10).map((record, index) => ({ id: `uuid-${index}`, secopId: record.secopId })),
+      );
 
       const records = makeRecords(10);
       const job = makeJob(records);
@@ -148,6 +180,8 @@ describe('ProcurementIngestionWorker', () => {
       repository.find.mockResolvedValue([
         { secopId: 'SECOP-0' },
         { secopId: 'SECOP-1' },
+        { id: 'uuid-0', secopId: 'SECOP-0' },
+        { id: 'uuid-1', secopId: 'SECOP-1' },
       ]);
 
       const records = makeRecords(2);
@@ -163,6 +197,9 @@ describe('ProcurementIngestionWorker', () => {
   describe('error handling', () => {
     it('marks chunk as failed when upsert throws', async () => {
       repository.upsert.mockRejectedValueOnce(new Error('DB timeout')).mockResolvedValue(undefined);
+      repository.find.mockResolvedValueOnce([]).mockResolvedValueOnce(
+        makeRecords(5).slice(0, 5).map((record, index) => ({ id: `uuid-${index}`, secopId: record.secopId })),
+      );
 
       const records = makeRecords(55); // 2 chunks: 50 + 5
       const job = makeJob(records);
@@ -174,6 +211,10 @@ describe('ProcurementIngestionWorker', () => {
       expect(result.created).toBe(5);
       expect(result.errors).toHaveLength(50);
       expect(result.errors[0]).toEqual({ secopId: 'SECOP-0', reason: 'DB timeout' });
+      expect(ingestionJobRepository.update).toHaveBeenLastCalledWith('ingestion-job-123', expect.objectContaining({
+        status: IngestionJobStatus.PARTIAL,
+        failedCount: 50,
+      }));
     });
 
     it('continues processing remaining chunks after one fails', async () => {
@@ -215,6 +256,87 @@ describe('ProcurementIngestionWorker', () => {
       expect(repository.find).not.toHaveBeenCalled();
       expect(repository.upsert).not.toHaveBeenCalled();
       expect(result).toEqual({ created: 0, updated: 0, failed: 0, errors: [] });
+    });
+
+    it('emits one event per persisted notice after successful upsert', async () => {
+      const job = makeJob(makeRecords(2));
+      repository.find
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          { id: 'uuid-1', secopId: 'SECOP-0' },
+          { id: 'uuid-2', secopId: 'SECOP-1' },
+        ]);
+
+      await worker.process(job);
+
+      expect(eventEmitter.emit).toHaveBeenCalledTimes(2);
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        NewProcurementNoticeEvent.EVENT_NAME,
+        expect.objectContaining({
+          ingestionJobId: 'ingestion-job-123',
+          procurementNoticeId: 'uuid-1',
+          secopId: 'SECOP-0',
+          action: 'created',
+        }),
+      );
+    });
+
+    it('persists rawData from sourceMetadata on new insert', async () => {
+      const job = makeJob([
+        {
+          secopId: 'SECOP-RAW-1',
+          title: 'Notice raw',
+          sourceMetadata: { upstream: 'payload-v1' },
+        } as any,
+      ]);
+      repository.find
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: 'uuid-raw-1', secopId: 'SECOP-RAW-1' }]);
+
+      await worker.process(job);
+
+      expect(repository.upsert).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            secopId: 'SECOP-RAW-1',
+            rawData: { upstream: 'payload-v1' },
+          }),
+        ]),
+        ['secopId'],
+      );
+    });
+
+    it('keeps latest accepted rawData semantics on upsert', async () => {
+      const job = makeJob([
+        {
+          secopId: 'SECOP-RAW-2',
+          title: 'Notice raw 2',
+          sourceMetadata: { upstream: 'payload-v2' },
+        } as any,
+      ]);
+      repository.find
+        .mockResolvedValueOnce([{ secopId: 'SECOP-RAW-2' }])
+        .mockResolvedValueOnce([{ id: 'uuid-raw-2', secopId: 'SECOP-RAW-2' }]);
+
+      await worker.process(job);
+
+      expect(repository.upsert).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            secopId: 'SECOP-RAW-2',
+            rawData: { upstream: 'payload-v2' },
+          }),
+        ]),
+        ['secopId'],
+      );
+    });
+
+    it('does not emit events when persistence fails', async () => {
+      repository.upsert.mockRejectedValueOnce(new Error('DB timeout'));
+
+      await worker.process(makeJob(makeRecords(2)));
+
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
   });
 

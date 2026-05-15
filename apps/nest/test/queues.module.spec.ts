@@ -1,11 +1,14 @@
 import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { BullModule, getQueueToken } from '@nestjs/bullmq';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { QueuesModule } from '../src/modules/queues/queues.module';
 import { ExampleQueueProducer } from '../src/modules/queues/producers/example-queue.producer';
 import { ExampleQueueWorker } from '../src/modules/queues/workers/example-queue.worker';
+import { ScoringDispatchProducer } from '../src/modules/queues/producers/scoring-dispatch.producer';
 import { QUEUE_NAMES } from '../src/modules/queues/constants/queue-names';
+import { IngestionJob } from '../src/modules/procurement-notices/entities/ingestion-job.entity';
 import { ProcurementNotice } from '../src/modules/procurement-notices/entities/procurement-notice.entity';
 
 describe('QueuesModule', () => {
@@ -29,6 +32,7 @@ describe('QueuesModule', () => {
             port: 6379,
           },
         }),
+        EventEmitterModule.forRoot(),
         QueuesModule,
       ],
     })
@@ -42,14 +46,24 @@ describe('QueuesModule', () => {
           failed: 0,
         }),
       })
+      .overrideProvider(getQueueToken(QUEUE_NAMES.SCORING))
+      .useValue({
+        add: jest.fn(),
+      })
       .overrideProvider(getRepositoryToken(ProcurementNotice))
       .useValue({
         find: jest.fn(),
         upsert: jest.fn(),
       })
+      .overrideProvider(getRepositoryToken(IngestionJob))
+      .useValue({
+        create: jest.fn(),
+        save: jest.fn(),
+      })
       .compile();
 
     expect(moduleRef.get(ExampleQueueProducer)).toBeDefined();
     expect(moduleRef.get(ExampleQueueWorker)).toBeDefined();
+    expect(moduleRef.get(ScoringDispatchProducer)).toBeDefined();
   });
 });
