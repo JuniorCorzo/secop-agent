@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { CreateProcurementNoticeDto } from '../../procurement-notices/dto/create-procurement-notice.dto';
@@ -16,7 +16,7 @@ import { SodaClientService } from './soda-client.service';
 type DatasetSource = 'SECOP_I' | 'SECOP_II';
 
 @Injectable()
-export class SodaIngestionService {
+export class SodaIngestionService implements OnApplicationBootstrap {
   private readonly logger = new Logger(SodaIngestionService.name);
   private readonly config;
   private isRunning = false;
@@ -37,6 +37,21 @@ export class SodaIngestionService {
       SODA_DATASET_SECOP2: this.configService.get('SODA_DATASET_SECOP2'),
       SODA_PAGE_SIZE: this.configService.get('SODA_PAGE_SIZE'),
       SODA_CRON: this.configService.get('SODA_CRON'),
+    });
+  }
+
+  /**
+   * Fires a background ingestion cycle immediately after the app finishes
+   * bootstrapping. This ensures the DB is populated on first start without
+   * waiting for the first cron tick (up to 6 hours away).
+   *
+   * The cycle runs in the background — bootstrap is not blocked.
+   * Errors are caught and logged so they never crash the process.
+   */
+  onApplicationBootstrap(): void {
+    this.runIngestionCycle().catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Bootstrap ingestion cycle failed: ${message}`);
     });
   }
 

@@ -116,4 +116,25 @@ describe('SodaIngestionService', () => {
     expect(state.lastRunTimestamp).not.toBeNull();
     expect(typeof state.lastRunTimestamp).toBe('string');
   });
+
+  it('triggers runIngestionCycle on bootstrap without blocking', async () => {
+    const spy = jest.spyOn(service, 'runIngestionCycle').mockResolvedValue(undefined);
+
+    service.onApplicationBootstrap();
+
+    // bootstrap returns synchronously — cycle runs in background
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs error if bootstrap cycle fails without crashing', async () => {
+    const errorSpy = jest.spyOn((service as any).logger, 'error').mockImplementation(() => {});
+    jest.spyOn(service, 'runIngestionCycle').mockRejectedValueOnce(new Error('bootstrap fail'));
+
+    service.onApplicationBootstrap();
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Bootstrap ingestion cycle failed'),
+    );
+  });
 });
