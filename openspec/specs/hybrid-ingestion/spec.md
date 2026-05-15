@@ -2,37 +2,40 @@
 
 ## Purpose
 
-Provide a bulk ingestion boundary that accepts normalized SECOP notice payloads, validates them, and starts asynchronous processing through shared queue infrastructure.
+Provide a bulk ingestion boundary that accepts normalized SECOP notice payloads, validates them, and starts asynchronous processing through shared queue infrastructure. The automatic ingestion path is handled by the internal NestJS SODA scheduler — this spec covers the manual/external bulk submission contract.
 
 ## Non-Goals
 
-- `POST /convocatorias/fetch` is explicitly deferred to a later change with SODA integration.
-- This change does not define scheduler-driven automation or external HTTP fetching.
+- Scheduler-driven automation is covered by the `soda-scheduler` spec.
+- AI-based normalization or enrichment is out of scope for ingestion.
+- External agents (Hermes) are not part of the ingestion path.
 
 ## Constraints
 
 - Bulk ingestion MUST return quickly with async job tracking instead of blocking on record processing.
 - Batch size limits and payload validation MUST protect worker and database capacity.
+- The automatic scheduler path MUST call `bulkUpsert()` directly without going through the HTTP endpoint.
 
 ## Requirements
 
 ### Requirement: Bulk Submission Contract
 
-The system MUST expose `POST /convocatorias/bulk` for authorized clients to submit normalized `Convocatoria` batches and receive an asynchronous job identifier.
+El sistema MUST exponer `POST /procurement-notices/bulk` para ingestas manuales o externas. La ingesta automática ahora la realiza el scheduler interno de NestJS directamente — no depende de clientes externos como Hermes.
 
-#### Scenario: Valid bulk submission
+#### Scenario: Ingesta automática interna
+- **WHEN** el scheduler interno completa un ciclo de paginación SODA
+- **THEN** los registros normalizados se persisten vía `bulkUpsert()` directamente
+- **AND** no se usa el endpoint HTTP interno (evita overhead de red innecesario)
 
-- GIVEN an authorized client sends a valid normalized batch
-- WHEN `POST /convocatorias/bulk` is called
-- THEN the system accepts the batch for asynchronous ingestion
-- AND returns a job identifier for later inspection
+#### Scenario: Ingesta manual vía endpoint
+- **WHEN** un cliente autorizado envía un batch normalizado a `POST /procurement-notices/bulk`
+- **THEN** el sistema acepta el batch para ingesta asíncrona
+- **AND** retorna un job identifier para inspección posterior
 
-#### Scenario: Invalid bulk submission
-
-- GIVEN a client sends malformed records or exceeds allowed batch constraints
-- WHEN `POST /convocatorias/bulk` is called
-- THEN the system rejects the request before enqueueing work
-- AND no ingestion side effects occur
+#### Scenario: Batch inválido rechazado
+- **WHEN** un cliente envía registros malformados o excede los límites del batch
+- **THEN** el sistema rechaza el request antes de encolar trabajo
+- **AND** no ocurren efectos secundarios de ingesta
 
 ### Requirement: Idempotent Ingestion Outcome
 
@@ -66,3 +69,4 @@ The system MUST make terminal ingestion outcomes inspectable with counts suffici
 - WHEN the job reaches terminal state
 - THEN the system reports failure in job outcome
 - AND successful records from other valid chunks remain observable
+

@@ -76,11 +76,12 @@ export class ProcurementIngestionWorker extends WorkerHost {
       try {
         const entities = chunk.map((record) => ({
           secopId: record.secopId,
+          source: record.source,
           title: record.title,
           description: record.description ?? null,
           status: record.status ?? null,
           entityName: record.entityName ?? null,
-          contactInfo: record.contactInfo ?? null,
+          entityNit: record.entityNit ?? null,
           value: record.value ?? null,
           currency: record.currency ?? null,
           publicationDate: record.publicationDate
@@ -89,8 +90,23 @@ export class ProcurementIngestionWorker extends WorkerHost {
           deadlineDate: record.deadlineDate
             ? new Date(record.deadlineDate)
             : null,
-          sector: record.sector ?? null,
+          contractingModality: record.contractingModality ?? null,
+          contractType: record.contractType ?? null,
+          unspscCode: record.unspscCode ?? null,
+          unspscGroup: record.unspscGroup ?? null,
+          unspscFamily: record.unspscFamily ?? null,
+          unspscClass: record.unspscClass ?? null,
+          unspscName: record.unspscName ?? null,
+          department: record.department ?? null,
           location: record.location ?? null,
+          awardedContractorNit: record.awardedContractorNit ?? null,
+          awardedContractorName: record.awardedContractorName ?? null,
+          awardedValue: record.awardedValue ?? null,
+          awardedDate: record.awardedDate ? new Date(record.awardedDate) : null,
+          processUrl: record.processUrl ?? null,
+          sourceLastUpdatedAt: record.sourceLastUpdatedAt
+            ? new Date(record.sourceLastUpdatedAt)
+            : null,
           sourceMetadata: record.sourceMetadata ?? null,
           rawData: record.sourceMetadata ?? null,
         }));

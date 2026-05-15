@@ -15,6 +15,7 @@ import { LlmModule } from './modules/llm/llm.module';
 import { QueuesModule } from './modules/queues/queues.module';
 import { RagModule } from './modules/rag/rag.module';
 import { ScoringModule } from './modules/scoring/scoring.module';
+import { SodaIngestionModule } from './modules/soda-ingestion/soda-ingestion.module';
 import { validateEnvironment } from './config/env.validation';
 import { createTypeOrmOptions } from './config/typeorm.options';
 
@@ -40,6 +41,7 @@ import { createTypeOrmOptions } from './config/typeorm.options';
     QueuesModule,
     RagModule,
     ScoringModule,
+    SodaIngestionModule,
   ],
 })
 export class AppModule {}

@@ -74,9 +74,14 @@ export class ProcurementNoticesService {
   async create(dto: CreateProcurementNoticeDto): Promise<ProcurementNotice> {
     const entity = this.repository.create({
       ...dto,
+      source: dto.source ?? 'SECOP_II',
       status: dto.status ?? DEFAULT_STATUS,
       publicationDate: dto.publicationDate ? new Date(dto.publicationDate) : undefined,
       deadlineDate: dto.deadlineDate ? new Date(dto.deadlineDate) : undefined,
+      awardedDate: dto.awardedDate ? new Date(dto.awardedDate) : undefined,
+      sourceLastUpdatedAt: dto.sourceLastUpdatedAt
+        ? new Date(dto.sourceLastUpdatedAt)
+        : undefined,
     });
 
     try {
@@ -187,6 +192,9 @@ export class ProcurementNoticesService {
       updatedAt: 'notice.updatedAt',
       publicationDate: 'notice.publicationDate',
       deadlineDate: 'notice.deadlineDate',
+      awardedDate: 'notice.awardedDate',
+      value: 'notice.value',
+      awardedValue: 'notice.awardedValue',
       title: 'notice.title',
       status: 'notice.status',
     };
@@ -196,7 +204,7 @@ export class ProcurementNoticesService {
 
     if (dto.query) {
       qb.andWhere(
-        '(notice.title ILIKE :query OR notice.secopId ILIKE :query OR notice.entityName ILIKE :query OR notice.sector ILIKE :query OR notice.location ILIKE :query)',
+        '(notice.title ILIKE :query OR notice.secopId ILIKE :query OR notice.entityName ILIKE :query OR notice.unspscName ILIKE :query OR notice.department ILIKE :query OR notice.location ILIKE :query)',
         { query: `%${dto.query}%` },
       );
     }
@@ -213,16 +221,54 @@ export class ProcurementNoticesService {
       qb.andWhere('notice.entityName ILIKE :entityName', { entityName: `%${dto.entityName}%` });
     }
 
+    if (dto.entityNit) {
+      qb.andWhere('notice.entityNit = :entityNit', { entityNit: dto.entityNit });
+    }
+
     if (dto.status) {
       qb.andWhere('notice.status = :status', { status: dto.status });
     }
 
-    if (dto.sector) {
-      qb.andWhere('notice.sector ILIKE :sector', { sector: `%${dto.sector}%` });
+    if (dto.source) {
+      qb.andWhere('notice.source = :source', { source: dto.source });
+    }
+
+    if (dto.contractingModality) {
+      qb.andWhere('notice.contractingModality ILIKE :contractingModality', {
+        contractingModality: `%${dto.contractingModality}%`,
+      });
+    }
+
+    if (dto.contractType) {
+      qb.andWhere('notice.contractType ILIKE :contractType', {
+        contractType: `%${dto.contractType}%`,
+      });
+    }
+
+    if (dto.unspscCode) {
+      qb.andWhere('notice.unspscCode = :unspscCode', { unspscCode: dto.unspscCode });
+    }
+
+    if (dto.department) {
+      qb.andWhere('notice.department ILIKE :department', { department: `%${dto.department}%` });
     }
 
     if (dto.location) {
       qb.andWhere('notice.location ILIKE :location', { location: `%${dto.location}%` });
+    }
+
+    if (dto.awardedContractorNit) {
+      qb.andWhere('notice.awardedContractorNit = :awardedContractorNit', {
+        awardedContractorNit: dto.awardedContractorNit,
+      });
+    }
+
+    if (dto.minValue !== undefined) {
+      qb.andWhere('notice.value >= :minValue', { minValue: dto.minValue });
+    }
+
+    if (dto.maxValue !== undefined) {
+      qb.andWhere('notice.value <= :maxValue', { maxValue: dto.maxValue });
     }
 
     const [data, total] = await qb
@@ -315,16 +361,30 @@ export class ProcurementNoticesService {
 
     const entities = validRecords.map((dto) => ({
       ...dto,
+      source: dto.source ?? 'SECOP_II',
       status: dto.status ?? DEFAULT_STATUS,
       publicationDate: dto.publicationDate ? new Date(dto.publicationDate) : null,
       deadlineDate: dto.deadlineDate ? new Date(dto.deadlineDate) : null,
+      awardedDate: dto.awardedDate ? new Date(dto.awardedDate) : null,
+      sourceLastUpdatedAt: dto.sourceLastUpdatedAt ? new Date(dto.sourceLastUpdatedAt) : null,
       description: dto.description ?? null,
       entityName: dto.entityName ?? null,
-      contactInfo: dto.contactInfo ?? null,
+      entityNit: dto.entityNit ?? null,
       value: dto.value ?? null,
       currency: dto.currency ?? null,
-      sector: dto.sector ?? null,
+      contractingModality: dto.contractingModality ?? null,
+      contractType: dto.contractType ?? null,
+      unspscCode: dto.unspscCode ?? null,
+      unspscGroup: dto.unspscGroup ?? null,
+      unspscFamily: dto.unspscFamily ?? null,
+      unspscClass: dto.unspscClass ?? null,
+      unspscName: dto.unspscName ?? null,
+      department: dto.department ?? null,
       location: dto.location ?? null,
+      awardedContractorNit: dto.awardedContractorNit ?? null,
+      awardedContractorName: dto.awardedContractorName ?? null,
+      awardedValue: dto.awardedValue ?? null,
+      processUrl: dto.processUrl ?? null,
       sourceMetadata: dto.sourceMetadata ?? null,
     }));
 
@@ -337,6 +397,14 @@ export class ProcurementNoticesService {
       duplicates: duplicates + existingSet.size,
       invalid: invalidCount,
     };
+  }
+
+  /**
+   * Semantic alias used by the SODA scheduler path.
+   * Current persistence behavior remains duplicate-safe upsert semantics.
+   */
+  async bulkUpsert(records: CreateProcurementNoticeDto[]): Promise<BulkIngestResult> {
+    return this.bulkIngest(records);
   }
 
   /**

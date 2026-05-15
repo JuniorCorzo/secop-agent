@@ -87,7 +87,7 @@ describe('Procurement Ingestion Terminal States (real Redis)', () => {
 
       const job = await producer.add({
         ingestionJobId: '11111111-1111-4111-8111-111111111111',
-        records: [{ secopId: 'SECOP-001', title: 'Terminal Test' }],
+        records: [{ secopId: 'SECOP-001', source: 'SECOP_II', title: 'Terminal Test' }],
       });
       expect(job.id).toBeDefined();
       expect(job.opts.attempts).toBe(3);
@@ -134,7 +134,7 @@ describe('Procurement Ingestion Terminal States (real Redis)', () => {
 
         const job = await producer.add({
           ingestionJobId: '22222222-2222-4222-8222-222222222222',
-          records: [{ secopId: 'SECOP-FAIL', title: 'Fail Test' }],
+          records: [{ secopId: 'SECOP-FAIL', source: 'SECOP_II', title: 'Fail Test' }],
         });
         expect(job.id).toBeDefined();
         expect(job.opts.attempts).toBe(3);
