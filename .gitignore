@@ -64,3 +64,15 @@ temp/
 .claude/
 .kiro/
 skills-lock.json
+# Local Pi runtime state
+.atl/
+
+datasets
+
+# Pi runtime state
+.pi/*
+!.pi/skills/
+!.pi/prompts/
+!.pi/settings.json
+.codegraph/
+.pi-lens/
