@@ -1,42 +1,50 @@
-import { DataSource, DataSourceOptions } from 'typeorm';
-import { databaseConfig } from './config/database.config';
-import { SchemaHealth } from './common/entities/schema-health.entity';
-import { User } from './modules/auth/entities/user.entity';
-import { IngestionJob } from './modules/procurement-notices/entities/ingestion-job.entity';
-import { ProcurementNotice } from './modules/procurement-notices/entities/procurement-notice.entity';
+import { DataSource, type DataSourceOptions } from "typeorm";
+import { databaseConfig } from "./config/database.config";
+import { SchemaHealth } from "./common/entities/schema-health.entity";
+import { User } from "./modules/auth/entities/user.entity";
+import { IngestionJob } from "./modules/procurement-notices/entities/ingestion-job.entity";
+import { ProcurementNotice } from "./modules/procurement-notices/entities/procurement-notice.entity";
+import { IngestionState } from "./modules/soda-ingestion/entities/ingestion-state.entity";
 
 /**
  * TypeORM CLI data source — used only for migration:generate and migration:run.
  * Reads DB config directly from process.env without full NestJS env validation
  * so the CLI works with a minimal .env containing only DB_* variables.
  */
-const toBoolean = (value: unknown): boolean => value === true || value === 'true';
+const toBoolean = (value: unknown): boolean =>
+	value === true || value === "true";
 
 const db = databaseConfig({
-  DB_HOST: process.env.DB_HOST ?? 'localhost',
-  DB_PORT: Number(process.env.DB_PORT ?? 5432),
-  DB_USERNAME: process.env.DB_USERNAME ?? 'secop',
-  DB_PASSWORD: process.env.DB_PASSWORD ?? 'secop_dev',
-  DB_NAME: process.env.DB_NAME ?? 'secop_agent',
-  DB_SCHEMA: process.env.DB_SCHEMA ?? 'public',
-  DB_SSL: toBoolean(process.env.DB_SSL),
-  DB_LOGGING: toBoolean(process.env.DB_LOGGING),
+	DB_HOST: process.env.DB_HOST ?? "localhost",
+	DB_PORT: Number(process.env.DB_PORT ?? 5432),
+	DB_USERNAME: process.env.DB_USERNAME ?? "secop",
+	DB_PASSWORD: process.env.DB_PASSWORD ?? "secop_dev",
+	DB_NAME: process.env.DB_NAME ?? "secop_agent",
+	DB_SCHEMA: process.env.DB_SCHEMA ?? "public",
+	DB_SSL: toBoolean(process.env.DB_SSL),
+	DB_LOGGING: toBoolean(process.env.DB_LOGGING),
 });
 
 export const dataSourceOptions: DataSourceOptions = {
-  type: 'postgres',
-  host: db.host,
-  port: db.port,
-  username: db.username,
-  password: db.password,
-  database: db.database,
-  schema: db.schema,
-  logging: db.logging,
-  synchronize: false,
-  entities: [SchemaHealth, User, ProcurementNotice, IngestionJob],
-  migrations: ['src/migrations/*.ts'],
-  migrationsTableName: 'typeorm_migrations',
-  ...(db.ssl ? { ssl: { rejectUnauthorized: false } } : {}),
+	type: "postgres",
+	host: db.host,
+	port: db.port,
+	username: db.username,
+	password: db.password,
+	database: db.database,
+	schema: db.schema,
+	logging: db.logging,
+	synchronize: false,
+	entities: [
+		SchemaHealth,
+		User,
+		ProcurementNotice,
+		IngestionJob,
+		IngestionState,
+	],
+	migrations: ["src/migrations/*.ts"],
+	migrationsTableName: "typeorm_migrations",
+	...(db.ssl ? { ssl: { rejectUnauthorized: false } } : {}),
 };
 
 export default new DataSource(dataSourceOptions);
