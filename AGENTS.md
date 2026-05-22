@@ -35,11 +35,6 @@ bun run --cwd apps/nest migration:generate -- src/migrations/<Name>
 bun run --cwd apps/nest migration:run
 bun run --cwd apps/nest migration:revert
 
-# Data ingestion
-bun run --cwd apps/nest bulk-csv-import --help                          # Show help
-bun run --cwd apps/nest bulk-csv-import --source=SECOP_I --path=./datasets/SECOP_I.csv --dry-run  # Parse-only (validate CSV)
-bun run --cwd apps/nest bulk-csv-import --source=SECOP_I --path=./datasets/SECOP_I.csv  # Full import
-
 # Frontend
 bun run --cwd apps/web dev         # Vite dev server (:5173)
 
@@ -124,33 +119,7 @@ apps/nest/src/modules/<feature>/
 
 ### Data Ingestion
 
-Two paths for populating the DB:
-
-**Online (SODA API)** — `SodaIngestionService` runs on app bootstrap and via cron (`@Cron('0 */6 * * *')`). Fetches from SECOP_I (`f789-7hwg`) and SECOP_II (`p6dx-8zbt`) datasets incrementally using last-run timestamps.
-
-**Offline (CSV bulk import)** — For large initial seeds. Scripts live in `apps/nest/scripts/`:
-
-```
-apps/nest/
-├── datasets/                    # CSV files (gitignored, large)
-│   ├── SECOP_I.csv
-│   └── SECOP_II.csv
-└── scripts/
-    ├── typeorm-stub.ts
-    └── bulk-csv-import.ts        # Bulk CSV import script
-```
-
-Usage:
-
-```bash
-# Validate CSV before writing
-bun run --cwd apps/nest bulk-csv-import --source=SECOP_I --path=./datasets/SECOP_I.csv --dry-run
-
-# Full import (upsert in batches of 500)
-bun run --cwd apps/nest bulk-csv-import --source=SECOP_II --path=./datasets/SECOP_II.csv
-```
-
-The script uses existing `mapSecopI`/`mapSecopII` mappers and `bulkUpsert()` from `ProcurementNoticesService`. Deduplication by `secopId` is within-batch; existing records are skip-upserted.
+**Online (SODA API)** — `SodaIngestionService` runs on app bootstrap and via cron (`@Cron('0 */6 * * *')`). Fetches from SECOP_I (`f789-7hwg`) and SECOP_II (`p6dx-8zbt`) datasets incrementally using cursor-based pagination with persistent state in `ingestion_state` table.
 
 ## Testing
 

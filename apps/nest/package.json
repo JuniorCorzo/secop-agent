@@ -14,8 +14,7 @@
     "test:cov": "jest --coverage",
     "migration:generate": "bun -r ./scripts/typeorm-stub.ts ./node_modules/typeorm/cli.js migration:generate -d ./src/data-source.ts",
     "migration:run": "bun -r ./scripts/typeorm-stub.ts ./node_modules/typeorm/cli.js migration:run -d ./src/data-source.ts",
-    "migration:revert": "bun -r ./scripts/typeorm-stub.ts ./node_modules/typeorm/cli.js migration:revert -d ./src/data-source.ts",
-    "bulk-csv-import": "bun run scripts/bulk-csv-import.ts"
+    "migration:revert": "bun -r ./scripts/typeorm-stub.ts ./node_modules/typeorm/cli.js migration:revert -d ./src/data-source.ts"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.1",
