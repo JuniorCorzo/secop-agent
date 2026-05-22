@@ -70,6 +70,9 @@ skills-lock.json
 datasets
 
 # Pi runtime state
-.pi/
+.pi/*
+!.pi/skills/
+!.pi/prompts/
+!.pi/settings.json
 .codegraph/
 .pi-lens/
