@@ -23,14 +23,14 @@ import {
 
 // ── Types ──────────────────────────────────────────────────────
 
-interface IngestionJobResult {
+export interface IngestionJobResult {
 	created: number;
 	updated: number;
 	failed: number;
 	errors: Array<{ secopId: string; reason: string }>;
 }
 
-interface IngestionRecord {
+export interface IngestionRecord {
 	secopId: string;
 	source?: string;
 	title?: string;
@@ -150,7 +150,9 @@ function loadEnvIfNeeded(): void {
 
 // ── Deduplication ──────────────────────────────────────────────
 
-function deduplicateRecords(records: IngestionRecord[]): IngestionRecord[] {
+export function deduplicateRecords(
+	records: IngestionRecord[],
+): IngestionRecord[] {
 	const map = new Map<string, IngestionRecord>();
 	for (const record of records) {
 		map.set(record.secopId, record);
@@ -160,7 +162,7 @@ function deduplicateRecords(records: IngestionRecord[]): IngestionRecord[] {
 
 // ── Entity mapping ─────────────────────────────────────────────
 
-function toEntityShape(record: IngestionRecord): EntityShape {
+export function toEntityShape(record: IngestionRecord): EntityShape {
 	return {
 		secopId: record.secopId,
 		source: record.source ?? "SECOP_II",
