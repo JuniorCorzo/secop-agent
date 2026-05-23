@@ -50,7 +50,7 @@ export const PROCUREMENT_INGESTION_WORKER = "PROCUREMENT_INGESTION_WORKER";
 				const worker = new Worker(
 					QUEUE_NAMES.PROCUREMENT_NOTICE_INGESTION,
 					// Bun executes TypeScript natively — pass the .ts file directly
-					require("path").join(__dirname, "processors", "import-processor.js"),
+					require("path").join(__dirname, "processors", "import-processor.ts"),
 					{
 						connection: {
 							host: configService.get<string>("REDIS_HOST") ?? "localhost",
