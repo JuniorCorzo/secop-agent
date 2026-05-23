@@ -47,10 +47,15 @@ export const PROCUREMENT_INGESTION_WORKER = "PROCUREMENT_INGESTION_WORKER";
 			useFactory: (configService: ConfigService): Worker => {
 				const logger = new Logger("ImportProcessor");
 
+				const path = require("path");
+				const fs = require("fs");
+				const tsPath = path.join(__dirname, "processors", "import-processor.ts");
+				const jsPath = path.join(__dirname, "processors", "import-processor.js");
+				const processorPath = fs.existsSync(tsPath) ? tsPath : jsPath;
+
 				const worker = new Worker(
 					QUEUE_NAMES.PROCUREMENT_NOTICE_INGESTION,
-					// Bun executes TypeScript natively — pass the .ts file directly
-					require("path").join(__dirname, "processors", "import-processor.ts"),
+					processorPath,
 					{
 						connection: {
 							host: configService.get<string>("REDIS_HOST") ?? "localhost",
