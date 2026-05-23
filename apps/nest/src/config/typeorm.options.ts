@@ -4,6 +4,7 @@ import { User } from "../modules/auth/entities/user.entity";
 import { IngestionJob } from "../modules/procurement-notices/entities/ingestion-job.entity";
 import { ProcurementNotice } from "../modules/procurement-notices/entities/procurement-notice.entity";
 import { IngestionState } from "../modules/soda-ingestion/entities/ingestion-state.entity";
+import { Company } from "../modules/companies/entities/company.entity";
 import { databaseConfig } from "./database.config";
 
 export const createTypeOrmOptions = (configService: ConfigService) => {
@@ -36,6 +37,7 @@ export const createTypeOrmOptions = (configService: ConfigService) => {
 			ProcurementNotice,
 			IngestionJob,
 			IngestionState,
+			Company,
 		],
 		...(db.ssl ? { ssl: { rejectUnauthorized: false } } : {}),
 	};
