@@ -2,6 +2,7 @@
   "name": "secop-agent",
   "version": "0.1.0",
   "private": true,
+  "license": "GPL-3.0-or-later",
   "description": "Monorepo for SECOP bidding analysis platform — NestJS backend + React dashboard",
   "workspaces": [
     "apps/*"
