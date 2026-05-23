@@ -17,7 +17,7 @@ import { ConfigService } from "@nestjs/config";
 import { createTypeOrmOptions } from "../../../config/typeorm.options";
 import { ProcurementNotice } from "../../procurement-notices/entities/procurement-notice.entity";
 import { SectorKeyword } from "../../procurement-notices/entities/sector-keyword.entity";
-import { classify } from "../../procurement-notices/services/sector-classifier.service";
+import { classify } from "../../procurement-notices/utils/sector-classifier.utils";
 import {
 	IngestionJob,
 	IngestionJobStatus,

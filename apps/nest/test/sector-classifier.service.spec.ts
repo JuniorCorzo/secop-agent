@@ -1,5 +1,5 @@
-import { classify, normalizeText } from '@/modules/procurement-notices/services/sector-classifier.service';
-import type { SectorScore } from '@/modules/procurement-notices/services/sector-classifier.service';
+import { classify, normalizeText } from '@/modules/procurement-notices/utils/sector-classifier.utils';
+import type { SectorScore } from '@/modules/procurement-notices/utils/sector-classifier.utils';
 import type { SectorKeyword } from '@/modules/procurement-notices/entities/sector-keyword.entity';
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
