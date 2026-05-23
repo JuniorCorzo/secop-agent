@@ -2,6 +2,7 @@
   "name": "@secop-agent/nest",
   "version": "0.1.0",
   "private": true,
+  "license": "GPL-3.0-or-later",
   "description": "NestJS backend — API Gateway, scoring engine, data ingestion",
   "scripts": {
     "build": "nest build",
