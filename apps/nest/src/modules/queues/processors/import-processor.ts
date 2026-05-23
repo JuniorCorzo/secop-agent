@@ -16,6 +16,8 @@ import { DataSource } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import { createTypeOrmOptions } from "../../../config/typeorm.options";
 import { ProcurementNotice } from "../../procurement-notices/entities/procurement-notice.entity";
+import { SectorKeyword } from "../../procurement-notices/entities/sector-keyword.entity";
+import { classify } from "../../procurement-notices/utils/sector-classifier.utils";
 import {
 	IngestionJob,
 	IngestionJobStatus,
@@ -89,6 +91,7 @@ interface EntityShape {
 	sourceLastUpdatedAt: Date | null;
 	sourceMetadata: Record<string, unknown> | null;
 	rawData: Record<string, unknown> | null;
+	sector: string | null;
 }
 
 // ── Constants ──────────────────────────────────────────────────
@@ -162,11 +165,13 @@ export function deduplicateRecords(
 
 // ── Entity mapping ─────────────────────────────────────────────
 
-export function toEntityShape(record: IngestionRecord): EntityShape {
+export function toEntityShape(record: IngestionRecord, sectorKeywords: Pick<SectorKeyword, 'sector' | 'keyword' | 'weight'>[] = []): EntityShape {
+	const title = record.title ?? record.secopId;
+	const classificationResult = classify(title, sectorKeywords);
 	return {
 		secopId: record.secopId,
 		source: record.source ?? "SECOP_II",
-		title: record.title ?? record.secopId,
+		title,
 		description: record.description ?? null,
 		status: record.status ?? null,
 		entityName: record.entityName ?? null,
@@ -196,6 +201,7 @@ export function toEntityShape(record: IngestionRecord): EntityShape {
 			: null,
 		sourceMetadata: record.sourceMetadata ?? null,
 		rawData: record.sourceMetadata ?? null,
+		sector: classificationResult.sector,
 	};
 }
 
@@ -224,6 +230,9 @@ export default async function importProcessor(
 	// Deduplicate
 	const deduplicated = deduplicateRecords(records);
 
+	// Load all sector keywords once per batch (performance: avoids per-row DB queries)
+	const sectorKeywords = await db.getRepository(SectorKeyword).find();
+
 	// Load existing secopIds
 	const secopIds = deduplicated.map((r) => r.secopId);
 	const existingEntities =
@@ -240,7 +249,7 @@ export default async function importProcessor(
 		const chunk = deduplicated.slice(i, i + CHUNK_SIZE);
 
 		try {
-			const entities = chunk.map((record) => toEntityShape(record));
+			const entities = chunk.map((record) => toEntityShape(record, sectorKeywords));
 			await repository.upsert(entities as any, ["secopId"]);
 
 			for (const record of chunk) {

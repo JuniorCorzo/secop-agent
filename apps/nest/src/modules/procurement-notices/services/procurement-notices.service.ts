@@ -17,6 +17,10 @@ import {
   canTransitionProcurementNoticeStatus,
   isProcurementNoticeStatus,
 } from '../procurement-notice.types';
+import {
+  SectorClassifierService,
+  type ClassificationResult,
+} from './sector-classifier.service';
 
 /** Pagination metadata returned with every search response. */
 export interface PaginationMeta {
@@ -60,6 +64,7 @@ export class ProcurementNoticesService {
   constructor(
     @InjectRepository(ProcurementNotice)
     private readonly repository: Repository<ProcurementNotice>,
+    private readonly sectorClassifier: SectorClassifierService,
   ) {}
 
   /**
@@ -432,5 +437,31 @@ export class ProcurementNoticesService {
 
     const maybeCode = (error as { code?: unknown }).code;
     return typeof maybeCode === 'string' ? maybeCode : undefined;
+  }
+
+  /**
+   * Manually re-classifies a procurement notice using the Keyword Scoring algorithm.
+   *
+   * Steps:
+   * 1. Finds the notice by internal UUID.
+   * 2. Loads all sector keywords from the DB.
+   * 3. Runs Keyword Scoring on the notice `title`.
+   * 4. Persists the updated `sector` field.
+   * 5. Returns the updated notice and the full score breakdown.
+   *
+   * @param id - Internal UUID of the notice to classify.
+   * @returns The updated notice entity and detailed sector scores.
+   * @throws {NotFoundException} If the notice doesn't exist.
+   *
+   * @see sector-classification spec - Re-Clasificación Manual vía API
+   */
+  async classifyNotice(
+    id: string,
+  ): Promise<{ notice: ProcurementNotice; scores: ClassificationResult['scores'] }> {
+    const notice = await this.findOne(id);
+    const result = await this.sectorClassifier.classifyTitle(notice.title);
+    notice.sector = result.sector;
+    const updated = await this.repository.save(notice);
+    return { notice: updated, scores: result.scores };
   }
 }

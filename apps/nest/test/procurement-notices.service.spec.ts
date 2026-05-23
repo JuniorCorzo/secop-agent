@@ -22,7 +22,12 @@ describe('ProcurementNoticesService', () => {
         createQueryBuilder: jest.fn(() => queryBuilderMock()),
       };
 
-    service = new ProcurementNoticesService(repository);
+      const mockSectorClassifier = {
+        classifyTitle: jest.fn().mockResolvedValue({ sector: 'SALUD', scores: [] }),
+        loadKeywords: jest.fn().mockResolvedValue([]),
+      };
+
+    service = new ProcurementNoticesService(repository, mockSectorClassifier as any);
   });
 
   function queryBuilderMock() {
@@ -292,6 +297,41 @@ describe('ProcurementNoticesService', () => {
       repository.findOne.mockResolvedValue(existing);
 
       await expect(service.transitionLifecycle('uuid-1', 'AWARDED')).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('classifyNotice', () => {
+    it('finds the notice, classifies its title, persists the updated sector, and returns scores', async () => {
+      const notice = { id: 'uuid-1', title: 'Adquisición de insumos de salud', sector: null } as ProcurementNotice;
+      repository.findOne.mockResolvedValue(notice);
+
+      const mockScores = [
+        { sector: 'SALUD', score: 1.5 },
+        { sector: 'TI', score: 0 },
+      ];
+      jest.spyOn(service['sectorClassifier'], 'classifyTitle').mockResolvedValueOnce({
+        sector: 'SALUD',
+        scores: mockScores,
+      });
+
+      repository.save.mockImplementationOnce(async (entity: any) => entity);
+
+      const result = await service.classifyNotice('uuid-1');
+
+      expect(repository.findOne).toHaveBeenCalledWith({ where: { id: 'uuid-1' } });
+      expect(service['sectorClassifier'].classifyTitle).toHaveBeenCalledWith('Adquisición de insumos de salud');
+      expect(notice.sector).toBe('SALUD');
+      expect(repository.save).toHaveBeenCalledWith(notice);
+      expect(result).toEqual({
+        notice,
+        scores: mockScores,
+      });
+    });
+
+    it('throws NotFoundException if notice does not exist', async () => {
+      repository.findOne.mockResolvedValue(null);
+
+      await expect(service.classifyNotice('invalid-id')).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 

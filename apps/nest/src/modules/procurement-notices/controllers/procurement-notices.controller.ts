@@ -147,4 +147,20 @@ export class ProcurementNoticesController {
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.remove(id);
   }
+
+  /**
+   * Re-classifies a procurement notice using the Keyword Scoring algorithm.
+   *
+   * Loads the sector keyword catalog, scores the notice `title`, persists the
+   * winning sector, and returns the updated notice with the full score breakdown.
+   *
+   * @returns `200 OK` with `{ notice, scores }`.
+   * @throws `404 Not Found` if the UUID doesn't exist.
+   */
+  @Post(':id/classify')
+  @Roles(UserRole.admin, UserRole.analista)
+  classifyNotice(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.classifyNotice(id);
+  }
 }
+

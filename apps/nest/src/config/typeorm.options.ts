@@ -3,6 +3,7 @@ import { SchemaHealth } from "../common/entities/schema-health.entity";
 import { User } from "../modules/auth/entities/user.entity";
 import { IngestionJob } from "../modules/procurement-notices/entities/ingestion-job.entity";
 import { ProcurementNotice } from "../modules/procurement-notices/entities/procurement-notice.entity";
+import { SectorKeyword } from "../modules/procurement-notices/entities/sector-keyword.entity";
 import { IngestionState } from "../modules/soda-ingestion/entities/ingestion-state.entity";
 import { Company } from "../modules/companies/entities/company.entity";
 import { databaseConfig } from "./database.config";
@@ -38,6 +39,7 @@ export const createTypeOrmOptions = (configService: ConfigService) => {
 			IngestionJob,
 			IngestionState,
 			Company,
+			SectorKeyword,
 		],
 		...(db.ssl ? { ssl: { rejectUnauthorized: false } } : {}),
 	};
