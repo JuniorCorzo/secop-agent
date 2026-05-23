@@ -238,6 +238,22 @@ export class ProcurementNotice {
   @Column({ type: 'varchar', length: 50, nullable: true })
   sector: string | null;
 
+  /** Resolved latitude coordinate for the notice's execution department. */
+  @Column({ type: 'decimal', precision: 10, scale: 6, nullable: true })
+  latitude: number | null;
+
+  /** Resolved longitude coordinate for the notice's execution department. */
+  @Column({ type: 'decimal', precision: 10, scale: 6, nullable: true })
+  longitude: number | null;
+
+  /** Duration of execution in days. */
+  @Column({ name: 'execution_duration_days', type: 'integer', nullable: true })
+  executionDurationDays: number | null;
+
+  /** Calculated value per day of execution. */
+  @Column({ name: 'value_per_day', type: 'decimal', precision: 18, scale: 2, nullable: true })
+  valuePerDay: number | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
