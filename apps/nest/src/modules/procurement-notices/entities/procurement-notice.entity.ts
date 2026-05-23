@@ -228,6 +228,16 @@ export class ProcurementNotice {
   @Column({ name: 'raw_data', type: 'jsonb', nullable: true })
   rawData: Record<string, unknown> | null;
 
+  /**
+   * Classified industry sector, determined by the Keyword Scoring algorithm.
+   * Populated during batch ingestion and via the POST /:id/classify endpoint.
+   * Null until classification is run; "Otros" when no keywords match.
+   *
+   * @see sector-classification spec
+   */
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  sector: string | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
