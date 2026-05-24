@@ -18,6 +18,7 @@ import { createTypeOrmOptions } from "../../../config/typeorm.options";
 import { ProcurementNotice } from "../../procurement-notices/entities/procurement-notice.entity";
 import { SectorKeyword } from "../../procurement-notices/entities/sector-keyword.entity";
 import { classify } from "../../procurement-notices/utils/sector-classifier.utils";
+import { enrichRecord } from "../../procurement-notices/utils/enrichment.utils";
 import {
 	IngestionJob,
 	IngestionJobStatus,
@@ -92,6 +93,10 @@ interface EntityShape {
 	sourceMetadata: Record<string, unknown> | null;
 	rawData: Record<string, unknown> | null;
 	sector: string | null;
+	latitude: number | null;
+	longitude: number | null;
+	executionDurationDays: number | null;
+	valuePerDay: number | null;
 }
 
 // ── Constants ──────────────────────────────────────────────────
@@ -168,6 +173,7 @@ export function deduplicateRecords(
 export function toEntityShape(record: IngestionRecord, sectorKeywords: Pick<SectorKeyword, 'sector' | 'keyword' | 'weight'>[] = []): EntityShape {
 	const title = record.title ?? record.secopId;
 	const classificationResult = classify(title, sectorKeywords);
+	const enrichment = enrichRecord(record);
 	return {
 		secopId: record.secopId,
 		source: record.source ?? "SECOP_II",
@@ -175,9 +181,9 @@ export function toEntityShape(record: IngestionRecord, sectorKeywords: Pick<Sect
 		description: record.description ?? null,
 		status: record.status ?? null,
 		entityName: record.entityName ?? null,
-		entityNit: record.entityNit ?? null,
+		entityNit: enrichment.entityNit,
 		value: record.value ?? null,
-		currency: record.currency ?? null,
+		currency: enrichment.currency,
 		publicationDate: record.publicationDate
 			? new Date(record.publicationDate)
 			: null,
@@ -191,7 +197,7 @@ export function toEntityShape(record: IngestionRecord, sectorKeywords: Pick<Sect
 		unspscName: record.unspscName ?? null,
 		department: record.department ?? null,
 		location: record.location ?? null,
-		awardedContractorNit: record.awardedContractorNit ?? null,
+		awardedContractorNit: enrichment.awardedContractorNit,
 		awardedContractorName: record.awardedContractorName ?? null,
 		awardedValue: record.awardedValue ?? null,
 		awardedDate: record.awardedDate ? new Date(record.awardedDate) : null,
@@ -202,6 +208,10 @@ export function toEntityShape(record: IngestionRecord, sectorKeywords: Pick<Sect
 		sourceMetadata: record.sourceMetadata ?? null,
 		rawData: record.sourceMetadata ?? null,
 		sector: classificationResult.sector,
+		latitude: enrichment.latitude,
+		longitude: enrichment.longitude,
+		executionDurationDays: enrichment.executionDurationDays,
+		valuePerDay: enrichment.valuePerDay,
 	};
 }
 

@@ -1,0 +1,4 @@
+# Datasets (large CSV files)
+datasets/
+# Local Pi runtime state
+.atl/

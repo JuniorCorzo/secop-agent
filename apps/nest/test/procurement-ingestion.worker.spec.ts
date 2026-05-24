@@ -124,6 +124,28 @@ describe("import-processor", () => {
 			expect(entity.value).toBeNull();
 			expect(entity.awardedValue).toBeNull();
 		});
+
+		it("enriches fields via enrichRecord on mapping", () => {
+			const record: IngestionRecord = {
+				secopId: "SECOP-ENRICH",
+				department: "Antioquia",
+				publicationDate: "2026-05-01",
+				deadlineDate: "2026-05-06",
+				value: 500000,
+				entityNit: "800.197.268-4",
+				awardedContractorNit: "901-234 567",
+				currency: " cop ",
+			};
+			const entity = toEntityShape(record);
+
+			expect(entity.latitude).toBeCloseTo(6.25184, 5);
+			expect(entity.longitude).toBeCloseTo(-75.56359, 5);
+			expect(entity.executionDurationDays).toBe(5);
+			expect(entity.valuePerDay).toBe(100000);
+			expect(entity.entityNit).toBe("8001972684");
+			expect(entity.awardedContractorNit).toBe("901234567");
+			expect(entity.currency).toBe("COP");
+		});
 	});
 
 	describe("IngestionJobResult shape", () => {
