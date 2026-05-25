@@ -32,9 +32,28 @@ export class Company {
   @Column({ name: 'contracting_capacity', type: 'decimal', precision: 18, scale: 2, default: 0 })
   contractingCapacity: number;
 
+  @Column({ name: 'target_ticket', type: 'decimal', precision: 18, scale: 2, default: 0 })
+  targetTicket: number;
+
+  @Column({ name: 'working_capital', type: 'decimal', precision: 18, scale: 2, default: 0 })
+  workingCapital: number;
+
+  @Column({ name: 'annual_revenue', type: 'decimal', precision: 18, scale: 2, default: 0 })
+  annualRevenue: number;
+
+  @Column({ name: 'excluded_contract_types', type: 'text', array: true, default: '{}' })
+  excludedContractTypes: string[];
+
+  @Column({ name: 'excluded_modalities', type: 'text', array: true, default: '{}' })
+  excludedModalities: string[];
+
+  @Column({ name: 'unspsc_match_policy', type: 'varchar', length: 20, default: 'strict' })
+  unspscMatchPolicy: string;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 }
+
