@@ -6,6 +6,8 @@ import { ProcurementNotice } from "../modules/procurement-notices/entities/procu
 import { SectorKeyword } from "../modules/procurement-notices/entities/sector-keyword.entity";
 import { IngestionState } from "../modules/soda-ingestion/entities/ingestion-state.entity";
 import { Company } from "../modules/companies/entities/company.entity";
+import { CompanyContract } from "../modules/companies/entities/company-contract.entity";
+import { MatchingResult } from "../modules/scoring/entities/matching-result.entity";
 import { databaseConfig } from "./database.config";
 
 export const createTypeOrmOptions = (configService: ConfigService) => {
@@ -39,6 +41,8 @@ export const createTypeOrmOptions = (configService: ConfigService) => {
 			IngestionJob,
 			IngestionState,
 			Company,
+			CompanyContract,
+			MatchingResult,
 			SectorKeyword,
 		],
 		...(db.ssl ? { ssl: { rejectUnauthorized: false } } : {}),

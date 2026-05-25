@@ -7,6 +7,8 @@ import { ProcurementNotice } from "./modules/procurement-notices/entities/procur
 import { SectorKeyword } from "./modules/procurement-notices/entities/sector-keyword.entity";
 import { IngestionState } from "./modules/soda-ingestion/entities/ingestion-state.entity";
 import { Company } from "./modules/companies/entities/company.entity";
+import { CompanyContract } from "./modules/companies/entities/company-contract.entity";
+import { MatchingResult } from "./modules/scoring/entities/matching-result.entity";
 
 /**
  * TypeORM CLI data source — used only for migration:generate and migration:run.
@@ -44,6 +46,8 @@ export const dataSourceOptions: DataSourceOptions = {
 		IngestionJob,
 		IngestionState,
 		Company,
+		CompanyContract,
+		MatchingResult,
 		SectorKeyword,
 	],
 	migrations: ["src/migrations/*.ts"],
