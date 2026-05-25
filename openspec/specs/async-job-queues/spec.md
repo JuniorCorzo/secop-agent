@@ -3,9 +3,7 @@
 ## Purpose
 
 Provide shared BullMQ/Redis background execution so later procurement notice ingestion, document processing, scoring, alerts, and RAG work can run asynchronously without introducing domain-specific workers yet.
-
 ## Requirements
-
 ### Requirement: Shared Queue Bootstrap
 
 The system MUST initialize shared BullMQ queue infrastructure from validated Redis configuration during application startup and make registered queue services available to NestJS modules.
@@ -97,20 +95,19 @@ The system MUST expose queue infrastructure readiness and per-queue operational 
 
 ### Requirement: Procurement Ingestion Queue Contract
 
-The system MUST provide a domain-owned procurement ingestion producer and worker pair that uses shared BullMQ infrastructure for `Convocatoria` ingestion jobs.
+The system MUST provide a domain-owned procurement ingestion producer and worker pair that uses shared BullMQ infrastructure for `ProcurementNotice` ingestion jobs.
+(Previously: Contract targeted `Convocatoria` ingestion jobs and `/convocatorias/bulk`.)
 
 #### Scenario: Domain module enqueues procurement ingestion
-
 - GIVEN shared queue infrastructure is available
-- WHEN `POST /convocatorias/bulk` accepts a valid batch
+- WHEN `POST /procurement-notices/bulk` accepts a valid batch
 - THEN the domain submits a named procurement ingestion job to shared queue infrastructure
 - AND the caller receives a job identifier without waiting for worker completion
 
 #### Scenario: Queue contract remains domain-owned
-
 - GIVEN future Hermes or SODA automation is added later
 - WHEN those callers need ingestion
-- THEN they submit through same procurement ingestion producer contract
+- THEN they submit through the same procurement ingestion producer contract
 - AND they do not bypass domain validation rules
 
 ### Requirement: Chunked Procurement Worker Execution
@@ -130,3 +127,20 @@ The system MUST process procurement ingestion jobs asynchronously in chunks so l
 - WHEN worker finishes retries for affected work
 - THEN the failure is observable in job outcome
 - AND unaffected records can still complete under same job
+
+### Requirement: Scoring Dispatch Queue Contract
+
+The system MUST expose a named scoring-dispatch enqueue contract for successfully persisted procurement notices. Accepted scoring-dispatch jobs SHALL remain visible through existing per-queue operational counts, and enqueue payloads MUST carry dispatch context only.
+
+#### Scenario: Enqueue scoring dispatch after successful persistence
+- GIVEN a procurement notice was persisted successfully through ingestion
+- WHEN downstream dispatch is requested
+- THEN the system enqueues a scoring-dispatch job
+- AND operators can observe that queue through existing queue visibility surfaces
+
+#### Scenario: Reject invalid scoring dispatch payload
+- GIVEN the scoring-dispatch contract is defined
+- WHEN a module submits payload that violates that contract
+- THEN the job is rejected before worker execution
+- AND no scoring side effects occur
+
