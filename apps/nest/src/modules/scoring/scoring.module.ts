@@ -6,12 +6,16 @@ import { QueuesModule } from '../queues/queues.module';
 import { ScoringDispatchProducer } from '../queues/producers/scoring-dispatch.producer';
 import { CompaniesModule } from '../companies/companies.module';
 import { MatchingResult } from './entities/matching-result.entity';
+import { ScoreLog } from './entities/score-log.entity';
 import { ProcurementNotice } from '../procurement-notices/entities/procurement-notice.entity';
 import { Company } from '../companies/entities/company.entity';
 import { CompanyContract } from '../companies/entities/company-contract.entity';
 import { HardFiltersService } from './services/hard-filters.service';
 import { ScoringEngineService } from './services/scoring-engine.service';
+import { ScoringQueryService } from './services/scoring-query.service';
 import { ScoringWorker } from './workers/scoring.worker';
+import { ScoringController } from './controllers/scoring.controller';
+import { LlmModule } from '../llm/llm.module';
 
 @Injectable()
 /**
@@ -53,17 +57,20 @@ export class ScoringDispatchListener {
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([MatchingResult, ProcurementNotice, Company, CompanyContract]),
+    TypeOrmModule.forFeature([MatchingResult, ProcurementNotice, Company, CompanyContract, ScoreLog]),
     QueuesModule,
     CompaniesModule,
+    LlmModule,
   ],
+  controllers: [ScoringController],
   providers: [
     ScoringDispatchListener,
     HardFiltersService,
     ScoringEngineService,
+    ScoringQueryService,
     ScoringWorker,
   ],
-  exports: [HardFiltersService, ScoringEngineService],
+  exports: [HardFiltersService, ScoringEngineService, ScoringQueryService, TypeOrmModule],
 })
 /**
  * Module responsible for coordinating the scoring worker, hard filters, and affinity evaluations.

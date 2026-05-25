@@ -1,39 +1,29 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Job } from 'bullmq';
 import { QUEUE_NAMES } from '../../queues/constants/queue-names';
 import { ScoringDispatchJobData } from '../../queues/producers/scoring-dispatch.producer';
+import { CompanyScoringBatchJobData } from '../../queues/producers/company-scoring-batch.producer';
 import { ProcurementNotice } from '../../procurement-notices/entities/procurement-notice.entity';
 import { Company } from '../../companies/entities/company.entity';
 import { CompanyContract } from '../../companies/entities/company-contract.entity';
 import { MatchingResult } from '../entities/matching-result.entity';
+import { ScoreLog } from '../entities/score-log.entity';
 import { HardFiltersService } from '../services/hard-filters.service';
 import { ScoringEngineService } from '../services/scoring-engine.service';
+import { LLM_PROVIDER } from '../../llm/llm.module';
+import { LlmProvider } from '../../llm/interfaces/llm-provider.interface';
 
 /**
- * BullMQ background worker that processes scoring dispatch jobs.
- * Evaluates procurement notices against all registered companies, checking hard filters and calculating affinity scores.
+ * BullMQ background worker that processes scoring dispatch and batch scoring jobs.
  */
 @Processor(QUEUE_NAMES.SCORING)
 @Injectable()
 export class ScoringWorker extends WorkerHost {
-  /**
-   * Logger instance for the scoring worker.
-   */
   private readonly logger = new Logger(ScoringWorker.name);
 
-  /**
-   * Initializes the ScoringWorker.
-   *
-   * @param noticeRepository - Repository to interact with procurement notices.
-   * @param companyRepository - Repository to interact with companies.
-   * @param companyContractRepository - Repository to interact with company contracts.
-   * @param matchingResultRepository - Repository to interact with matching results.
-   * @param hardFiltersService - Service to evaluate hard exclusion filters.
-   * @param scoringEngineService - Service to calculate matching affinity scores.
-   */
   constructor(
     @InjectRepository(ProcurementNotice)
     private readonly noticeRepository: Repository<ProcurementNotice>,
@@ -43,43 +33,170 @@ export class ScoringWorker extends WorkerHost {
     private readonly companyContractRepository: Repository<CompanyContract>,
     @InjectRepository(MatchingResult)
     private readonly matchingResultRepository: Repository<MatchingResult>,
+    @InjectRepository(ScoreLog)
+    private readonly scoreLogRepository: Repository<ScoreLog>,
     private readonly hardFiltersService: HardFiltersService,
     private readonly scoringEngineService: ScoringEngineService,
+    @Inject(LLM_PROVIDER)
+    private readonly llmProvider: LlmProvider,
   ) {
     super();
   }
 
   /**
    * Main entry point to process a scoring job.
-   * Fetches notice, removes existing matches, checks filters, scores each company, and persists results.
-   *
-   * @param job - The BullMQ job containing notice details.
-   * @returns A promise resolving to the processing summary.
    */
-  async process(job: Job<ScoringDispatchJobData>): Promise<{ processed: true; companiesMatched: number }> {
+  async process(job: Job<any>): Promise<any> {
+    if (job.name === 'company-batch-scoring') {
+      return this.processCompanyBatchScoring(job);
+    } else {
+      return this.processScoringDispatch(job);
+    }
+  }
+
+  /**
+   * Processes the company-batch-scoring job type.
+   */
+  private async processCompanyBatchScoring(
+    job: Job<CompanyScoringBatchJobData>,
+  ): Promise<{ processed: true; noticesMatched: number }> {
+    const { companyId, noticeIds } = job.data;
+    this.logger.log(`Processing batch scoring for company ${companyId} against ${noticeIds.length} notices`);
+
+    const company = await this.companyRepository.findOne({ where: { id: companyId } });
+    if (!company) {
+      throw new Error(`Company ${companyId} not found`);
+    }
+
+    const companyContracts = await this.companyContractRepository.find({
+      where: { company: { id: companyId } },
+      relations: { company: true },
+    });
+
+    const notices = await this.noticeRepository.find({
+      where: { id: In(noticeIds) },
+    });
+
+    for (const notice of notices) {
+      await this.evaluateAndPersist(company, notice, companyContracts);
+    }
+
+    return { processed: true, noticesMatched: notices.length };
+  }
+
+  /**
+   * Processes the standard scoring-dispatch job type.
+   */
+  private async processScoringDispatch(
+    job: Job<ScoringDispatchJobData>,
+  ): Promise<{ processed: true; companiesMatched: number }> {
     const { procurementNoticeId, secopId } = job.data;
     this.logger.log(`Processing scoring match for notice ${procurementNoticeId} (${secopId})`);
 
     const notice = await this.fetchAndTransitionNotice(procurementNoticeId);
 
-    await this.deleteExistingResults(notice.id);
-
     const { companies, allContracts } = await this.fetchCompaniesAndContracts();
-
     const contractsByCompanyId = this.groupContractsByCompany(allContracts);
 
-    await this.processCompanyMatching(notice, companies, contractsByCompanyId);
+    for (const company of companies) {
+      const companyContracts = contractsByCompanyId[company.id] || [];
+      await this.evaluateAndPersist(company, notice, companyContracts);
+    }
 
     this.logger.log(`Completed matching for notice ${procurementNoticeId} against ${companies.length} companies`);
     return { processed: true, companiesMatched: companies.length };
   }
 
   /**
+   * Evaluates hard filters, calculates score, gets LLM narrative explanation and persists results.
+   */
+  private async evaluateAndPersist(
+    company: Company,
+    notice: ProcurementNotice,
+    companyContracts: CompanyContract[],
+  ): Promise<void> {
+    const filterResult = this.hardFiltersService.evaluate(company, notice, companyContracts);
+
+    let status: 'PASSED' | 'EXCLUDED';
+    let score = 0;
+    let category: 'VIABLE' | 'REVISAR' | 'BAJA_PRIORIDAD' | 'EXCLUIDO';
+    let breakdown: Record<string, any> = {};
+    let justification = filterResult.justification;
+
+    if (!filterResult.passed) {
+      status = 'EXCLUDED';
+      score = 0;
+      category = 'EXCLUIDO';
+      breakdown = {};
+    } else {
+      status = 'PASSED';
+      const scoreResult = this.scoringEngineService.computeScore(company, notice, companyContracts);
+      score = scoreResult.score;
+      category = score >= 70 ? 'VIABLE' : score >= 40 ? 'REVISAR' : 'BAJA_PRIORIDAD';
+      breakdown = scoreResult.vectorBreakdown;
+      justification = scoreResult.justification;
+    }
+
+    let explanation = justification;
+    if (category !== 'EXCLUIDO' && this.llmProvider) {
+      try {
+        const messages = [
+          {
+            role: 'system',
+            content: 'Eres un asistente analista experto en compras públicas colombianas (SECOP). Genera una breve justificación narrativa en español explicando la viabilidad del contrato para la empresa basándote en los datos provistos.',
+          },
+          {
+            role: 'user',
+            content: `Empresa: ${company.name}\nConvocatoria: ${notice.title || notice.secopId}\nScore: ${score}\nCategoría: ${category}\nDesglose: ${JSON.stringify(breakdown)}`,
+          },
+        ];
+        const response = await this.llmProvider.chat(messages, { timeout: 5000 });
+        if (response?.content) {
+          explanation = response.content;
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Failed to generate LLM explanation for company ${company.id} and notice ${notice.id}: ${error.message}. Falling back to default justification.`,
+        );
+      }
+    }
+
+    // Upsert MatchingResult
+    let matchingResult = await this.matchingResultRepository.findOne({
+      where: { company: { id: company.id }, notice: { id: notice.id } },
+    });
+    if (!matchingResult) {
+      matchingResult = this.matchingResultRepository.create({
+        company,
+        notice,
+      });
+    }
+    matchingResult.status = status;
+    matchingResult.score = score;
+    matchingResult.vectorBreakdown = breakdown;
+    matchingResult.justification = justification;
+    await this.matchingResultRepository.save(matchingResult);
+
+    // Append ScoreLog
+    const scoreLog = this.scoreLogRepository.create({
+      company,
+      notice,
+      totalScore: score,
+      category,
+      breakdown,
+      explanation,
+      filterResult: {
+        passed: filterResult.passed,
+        justification: filterResult.justification,
+        reason: filterResult.reason,
+      },
+      modelVersion: '1.0.0',
+    });
+    await this.scoreLogRepository.save(scoreLog);
+  }
+
+  /**
    * Fetches the procurement notice and transitions its status to SCORING.
-   *
-   * @param procurementNoticeId - The ID of the procurement notice to retrieve.
-   * @returns The transitioned ProcurementNotice entity.
-   * @throws Error if the notice is not found.
    */
   private async fetchAndTransitionNotice(procurementNoticeId: string): Promise<ProcurementNotice> {
     const notice = await this.noticeRepository.findOne({ where: { id: procurementNoticeId } });
@@ -93,19 +210,7 @@ export class ScoringWorker extends WorkerHost {
   }
 
   /**
-   * Deletes existing matching results for a notice to prevent duplicates.
-   *
-   * @param noticeId - The ID of the procurement notice.
-   * @returns A promise that resolves when deletion is complete.
-   */
-  private async deleteExistingResults(noticeId: string): Promise<void> {
-    await this.matchingResultRepository.delete({ notice: { id: noticeId } });
-  }
-
-  /**
    * Fetches all companies and contracts from the database.
-   *
-   * @returns A promise resolving to an object containing lists of companies and contracts.
    */
   private async fetchCompaniesAndContracts(): Promise<{
     companies: Company[];
@@ -120,9 +225,6 @@ export class ScoringWorker extends WorkerHost {
 
   /**
    * Groups company contracts by their associated company ID.
-   *
-   * @param allContracts - The list of all contracts to group.
-   * @returns A record mapping company ID strings to arrays of their contracts.
    */
   private groupContractsByCompany(allContracts: CompanyContract[]): Record<string, CompanyContract[]> {
     const contractsByCompanyId: Record<string, CompanyContract[]> = {};
@@ -138,70 +240,12 @@ export class ScoringWorker extends WorkerHost {
     return contractsByCompanyId;
   }
 
-  /**
-   * Processes the hard filter evaluation and scoring match for all companies.
-   *
-   * @param notice - The procurement notice to match against.
-   * @param companies - The list of all companies.
-   * @param contractsByCompanyId - Grouped contracts by company ID.
-   * @returns A promise that resolves when all matches have been processed and saved.
-   */
-  private async processCompanyMatching(
-    notice: ProcurementNotice,
-    companies: Company[],
-    contractsByCompanyId: Record<string, CompanyContract[]>,
-  ): Promise<void> {
-    for (const company of companies) {
-      const companyContracts = contractsByCompanyId[company.id] || [];
-
-      // Evaluate hard filters
-      const filterResult = this.hardFiltersService.evaluate(company, notice, companyContracts);
-
-      let matchingResult: MatchingResult;
-
-      if (!filterResult.passed) {
-        matchingResult = this.matchingResultRepository.create({
-          status: 'EXCLUDED',
-          score: 0,
-          vectorBreakdown: {},
-          justification: filterResult.justification,
-          company,
-          notice,
-        });
-      } else {
-        // Compute scoring
-        const scoreResult = this.scoringEngineService.computeScore(company, notice, companyContracts);
-        matchingResult = this.matchingResultRepository.create({
-          status: 'PASSED',
-          score: scoreResult.score,
-          vectorBreakdown: scoreResult.vectorBreakdown,
-          justification: scoreResult.justification,
-          company,
-          notice,
-        });
-      }
-
-      await this.matchingResultRepository.save(matchingResult);
-    }
-  }
-
   @OnWorkerEvent('completed')
-  /**
-   * Event handler called when a scoring job completes successfully.
-   *
-   * @param job - The completed BullMQ job.
-   */
   onCompleted(job: Job): void {
     this.logger.log(`Scoring job ${job.id} completed`);
   }
 
   @OnWorkerEvent('failed')
-  /**
-   * Event handler called when a scoring job fails.
-   *
-   * @param job - The failed BullMQ job.
-   * @param error - The error that caused the failure.
-   */
   onFailed(job: Job, error: Error): void {
     this.logger.error(`Scoring job ${job.id} failed: ${error.message}`);
   }

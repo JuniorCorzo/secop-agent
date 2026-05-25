@@ -8,6 +8,7 @@ import { ExampleQueueProducer } from "./producers/example-queue.producer";
 import { ExampleQueueWorker } from "./workers/example-queue.worker";
 import { ProcurementIngestionProducer } from "./producers/procurement-ingestion.producer";
 import { ScoringDispatchProducer } from "./producers/scoring-dispatch.producer";
+import { CompanyScoringBatchProducer } from "./producers/company-scoring-batch.producer";
 import { IngestionJob } from "../procurement-notices/entities/ingestion-job.entity";
 import { ProcurementNotice } from "../procurement-notices/entities/procurement-notice.entity";
 
@@ -40,6 +41,7 @@ export const PROCUREMENT_INGESTION_WORKER = "PROCUREMENT_INGESTION_WORKER";
 		ExampleQueueWorker,
 		ProcurementIngestionProducer,
 		ScoringDispatchProducer,
+		CompanyScoringBatchProducer,
 		// ── Sandboxed procurement ingestion worker ──────────────
 		{
 			provide: PROCUREMENT_INGESTION_WORKER,
@@ -88,6 +90,7 @@ export const PROCUREMENT_INGESTION_WORKER = "PROCUREMENT_INGESTION_WORKER";
 		ExampleQueueProducer,
 		ProcurementIngestionProducer,
 		ScoringDispatchProducer,
+		CompanyScoringBatchProducer,
 	],
 })
 export class QueuesModule implements OnApplicationShutdown {
