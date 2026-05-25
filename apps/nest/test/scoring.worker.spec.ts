@@ -1,259 +1,260 @@
-import { Job } from 'bullmq';
-import { ScoringWorker } from '../src/modules/scoring/workers/scoring.worker';
-import { ProcurementNotice } from '../src/modules/procurement-notices/entities/procurement-notice.entity';
-import { Company } from '../src/modules/companies/entities/company.entity';
-import { CompanyContract } from '../src/modules/companies/entities/company-contract.entity';
-import { MatchingResult } from '../src/modules/scoring/entities/matching-result.entity';
-import { ScoreLog } from '../src/modules/scoring/entities/score-log.entity';
-import { HardFiltersService } from '../src/modules/scoring/services/hard-filters.service';
-import { ScoringEngineService } from '../src/modules/scoring/services/scoring-engine.service';
-import { LlmProvider } from '../src/modules/llm/interfaces/llm-provider.interface';
+import type { Job } from "bullmq";
+import { ScoringWorker } from "../src/modules/scoring/workers/scoring.worker";
+import { ProcurementNotice } from "../src/modules/procurement-notices/entities/procurement-notice.entity";
+import { Company } from "../src/modules/companies/entities/company.entity";
+import { CompanyContract } from "../src/modules/companies/entities/company-contract.entity";
+import type { ScoringPersistenceService } from "../src/modules/scoring/services/scoring-persistence.service";
 
-describe('ScoringWorker', () => {
-  let worker: ScoringWorker;
-  let noticeRepo: any;
-  let companyRepo: any;
-  let contractRepo: any;
-  let matchingResultRepo: any;
-  let scoreLogRepo: any;
-  let hardFiltersService: HardFiltersService;
-  let scoringEngineService: ScoringEngineService;
-  let llmProvider: any;
+describe("ScoringWorker", () => {
+	let worker: ScoringWorker;
+	let noticeRepo: any;
+	let companyRepo: any;
+	let contractRepo: any;
+	let scoringPersistence: any;
 
-  beforeEach(() => {
-    noticeRepo = {
-      findOne: jest.fn(),
-      find: jest.fn(),
-      save: jest.fn(),
-    };
-    companyRepo = {
-      findOne: jest.fn(),
-      find: jest.fn(),
-    };
-    contractRepo = {
-      find: jest.fn(),
-    };
-    matchingResultRepo = {
-      findOne: jest.fn(),
-      delete: jest.fn(),
-      create: jest.fn(),
-      save: jest.fn(),
-    };
-    scoreLogRepo = {
-      create: jest.fn(),
-      save: jest.fn(),
-    };
+	beforeEach(() => {
+		noticeRepo = {
+			findOne: jest.fn(),
+			find: jest.fn(),
+			save: jest.fn(),
+		};
+		companyRepo = {
+			findOne: jest.fn(),
+			find: jest.fn(),
+		};
+		contractRepo = {
+			find: jest.fn(),
+		};
 
-    llmProvider = {
-      chat: jest.fn(),
-      embed: jest.fn(),
-      health: jest.fn(),
-    };
+		scoringPersistence = {
+			evaluateAndPersist: jest.fn().mockResolvedValue(undefined),
+		};
 
-    hardFiltersService = new HardFiltersService();
-    scoringEngineService = new ScoringEngineService();
+		worker = new ScoringWorker(
+			noticeRepo,
+			companyRepo,
+			contractRepo,
+			scoringPersistence as unknown as ScoringPersistenceService,
+		);
+	});
 
-    worker = new ScoringWorker(
-      noticeRepo,
-      companyRepo,
-      contractRepo,
-      matchingResultRepo,
-      scoreLogRepo,
-      hardFiltersService,
-      scoringEngineService,
-      llmProvider,
-    );
-  });
+	describe("process dispatch (strategy map)", () => {
+		it('routes "scoring-dispatch" jobs to the dispatch handler', async () => {
+			const notice = new ProcurementNotice();
+			notice.id = "notice-uuid";
+			notice.status = "ENRICHING";
 
-  describe('scoring-dispatch job', () => {
-    it('skips processing if the notice does not exist', async () => {
-      noticeRepo.findOne.mockResolvedValue(null);
-      const job = {
-        name: 'scoring-dispatch',
-        id: 'job-1',
-        data: { procurementNoticeId: 'notice-uuid', secopId: 'secop-id', sourceEvent: 'NewProcurementNoticeEvent' },
-      } as Job;
+			const company = new Company();
+			company.id = "company-1";
+			company.name = "Test Co";
 
-      await expect(worker.process(job)).rejects.toThrow('Procurement notice notice-uuid not found');
-    });
+			noticeRepo.findOne.mockResolvedValue(notice);
+			noticeRepo.save.mockResolvedValue(notice);
+			companyRepo.find.mockResolvedValue([company]);
+			contractRepo.find.mockResolvedValue([]);
 
-    it('runs matching, persists MatchingResult (upserted) and ScoreLog (appended), categorizes, and requests LLM narrative', async () => {
-      const notice = new ProcurementNotice();
-      notice.id = 'notice-uuid';
-      notice.status = 'ENRICHING';
-      notice.unspscCode = '43211502';
-      notice.value = 100000;
-      notice.department = 'Cundinamarca';
+			const job = {
+				name: "scoring-dispatch",
+				id: "job-1",
+				data: {
+					procurementNoticeId: "notice-uuid",
+					secopId: "secop-id",
+					sourceEvent: "NewProcurementNoticeEvent",
+				},
+			} as Job;
 
-      const companyPassed = new Company();
-      companyPassed.id = 'company-passed';
-      companyPassed.nit = '900000001';
-      companyPassed.name = 'Passed Company';
-      companyPassed.sectors = ['432115'];
-      companyPassed.regions = ['25'];
-      companyPassed.contractingCapacity = 500000;
+			const result = await worker.process(job);
 
-      noticeRepo.findOne.mockResolvedValue(notice);
-      noticeRepo.save.mockResolvedValue(notice);
-      companyRepo.find.mockResolvedValue([companyPassed]);
-      contractRepo.find.mockResolvedValue([]);
+			expect(result).toEqual({ processed: true, companiesMatched: 1 });
+			expect(scoringPersistence.evaluateAndPersist).toHaveBeenCalledWith(
+				company,
+				notice,
+				[],
+			);
+		});
 
-      matchingResultRepo.findOne.mockResolvedValue(null);
-      matchingResultRepo.create.mockImplementation((dto: any) => dto);
-      matchingResultRepo.save.mockImplementation((dto: any) => Promise.resolve({ id: 'res-id', ...dto }));
-      scoreLogRepo.create.mockImplementation((dto: any) => dto);
-      scoreLogRepo.save.mockImplementation((dto: any) => Promise.resolve({ id: 'log-id', ...dto }));
+		it('routes "company-batch-scoring" jobs to the batch handler', async () => {
+			const company = new Company();
+			company.id = "company-uuid";
+			company.name = "Batch Co";
 
-      llmProvider.chat.mockResolvedValue({ content: 'LLM generated narrative explanation' });
+			const notice = new ProcurementNotice();
+			notice.id = "notice-1";
 
-      const job = {
-        name: 'scoring-dispatch',
-        id: 'job-1',
-        data: { procurementNoticeId: 'notice-uuid', secopId: 'secop-id', sourceEvent: 'NewProcurementNoticeEvent' },
-      } as Job;
+			companyRepo.findOne.mockResolvedValue(company);
+			contractRepo.find.mockResolvedValue([]);
+			noticeRepo.find.mockResolvedValue([notice]);
 
-      const result = await worker.process(job);
+			const job = {
+				name: "company-batch-scoring",
+				id: "job-2",
+				data: { companyId: "company-uuid", noticeIds: ["notice-1"] },
+			} as Job;
 
-      expect(result).toEqual({ processed: true, companiesMatched: 1 });
-      expect(notice.status).toBe('SCORING');
-      expect(noticeRepo.save).toHaveBeenCalledWith(notice);
+			const result = await worker.process(job);
 
-      // Verify MatchingResult logic
-      expect(matchingResultRepo.save).toHaveBeenCalled();
-      const matchingSaveCall = matchingResultRepo.save.mock.calls[0][0];
-      expect(matchingSaveCall.status).toBe('PASSED');
-      expect(matchingSaveCall.score).toBeGreaterThan(0);
+			expect(result).toEqual({ processed: true, noticesMatched: 1 });
+			expect(scoringPersistence.evaluateAndPersist).toHaveBeenCalledWith(
+				company,
+				notice,
+				[],
+			);
+		});
 
-      // Verify ScoreLog logic
-      expect(scoreLogRepo.save).toHaveBeenCalled();
-      const logSaveCall = scoreLogRepo.save.mock.calls[0][0];
-      expect(logSaveCall.totalScore).toBe(matchingSaveCall.score);
-      expect(logSaveCall.category).toBeDefined();
-      expect(logSaveCall.explanation).toBe('LLM generated narrative explanation');
-      expect(llmProvider.chat).toHaveBeenCalled();
-    });
+		it("throws for unknown job names", async () => {
+			const job = {
+				name: "unknown-job-type",
+				id: "job-3",
+				data: {},
+			} as Job;
 
-    it('falls back to rule-based justification if LLM provider throws an error', async () => {
-      const notice = new ProcurementNotice();
-      notice.id = 'notice-uuid';
-      notice.status = 'ENRICHING';
-      notice.unspscCode = '43211502';
-      notice.value = 100000;
-      notice.department = 'Cundinamarca';
+			await expect(worker.process(job)).rejects.toThrow(
+				"Unknown job name: unknown-job-type",
+			);
+		});
+	});
 
-      const companyPassed = new Company();
-      companyPassed.id = 'company-passed';
-      companyPassed.nit = '900000001';
-      companyPassed.name = 'Passed Company';
-      companyPassed.sectors = ['432115'];
-      companyPassed.regions = ['25'];
-      companyPassed.contractingCapacity = 500000;
+	describe("scoring-dispatch handler", () => {
+		it("throws if the notice does not exist", async () => {
+			noticeRepo.findOne.mockResolvedValue(null);
+			const job = {
+				name: "scoring-dispatch",
+				id: "job-1",
+				data: {
+					procurementNoticeId: "notice-uuid",
+					secopId: "secop-id",
+					sourceEvent: "NewProcurementNoticeEvent",
+				},
+			} as Job;
 
-      noticeRepo.findOne.mockResolvedValue(notice);
-      noticeRepo.save.mockResolvedValue(notice);
-      companyRepo.find.mockResolvedValue([companyPassed]);
-      contractRepo.find.mockResolvedValue([]);
+			await expect(worker.process(job)).rejects.toThrow(
+				"Procurement notice notice-uuid not found",
+			);
+		});
 
-      matchingResultRepo.findOne.mockResolvedValue(null);
-      matchingResultRepo.create.mockImplementation((dto: any) => dto);
-      matchingResultRepo.save.mockImplementation((dto: any) => Promise.resolve({ id: 'res-id', ...dto }));
-      scoreLogRepo.create.mockImplementation((dto: any) => dto);
-      scoreLogRepo.save.mockImplementation((dto: any) => Promise.resolve({ id: 'log-id', ...dto }));
+		it("transitions notice status to SCORING", async () => {
+			const notice = new ProcurementNotice();
+			notice.id = "notice-uuid";
+			notice.status = "ENRICHING";
 
-      llmProvider.chat.mockRejectedValue(new Error('LLM Service Unavailable'));
+			noticeRepo.findOne.mockResolvedValue(notice);
+			noticeRepo.save.mockResolvedValue(notice);
+			companyRepo.find.mockResolvedValue([]);
+			contractRepo.find.mockResolvedValue([]);
 
-      const job = {
-        name: 'scoring-dispatch',
-        id: 'job-1',
-        data: { procurementNoticeId: 'notice-uuid', secopId: 'secop-id', sourceEvent: 'NewProcurementNoticeEvent' },
-      } as Job;
+			const job = {
+				name: "scoring-dispatch",
+				id: "job-1",
+				data: {
+					procurementNoticeId: "notice-uuid",
+					secopId: "secop-id",
+					sourceEvent: "NewProcurementNoticeEvent",
+				},
+			} as Job;
 
-      await expect(worker.process(job)).resolves.toEqual({ processed: true, companiesMatched: 1 });
+			await worker.process(job);
 
-      const logSaveCall = scoreLogRepo.save.mock.calls[0][0];
-      expect(logSaveCall.explanation).toContain('Puntaje total de afinidad'); // default rule-based justification fallback
-    });
-  });
+			expect(notice.status).toBe("SCORING");
+			expect(noticeRepo.save).toHaveBeenCalledWith(notice);
+		});
 
-  describe('company-batch-scoring job', () => {
-    it('skips processing if the company does not exist', async () => {
-      companyRepo.findOne.mockResolvedValue(null);
-      const job = {
-        name: 'company-batch-scoring',
-        id: 'job-2',
-        data: { companyId: 'company-uuid', noticeIds: ['notice-uuid-1'] },
-      } as Job;
+		it("delegates evaluation to ScoringPersistenceService for each company", async () => {
+			const notice = new ProcurementNotice();
+			notice.id = "notice-uuid";
+			notice.status = "ENRICHING";
 
-      await expect(worker.process(job)).rejects.toThrow('Company company-uuid not found');
-    });
+			const companyA = new Company();
+			companyA.id = "company-a";
+			const companyB = new Company();
+			companyB.id = "company-b";
 
-    it('evaluates single company against multiple notices and persists results', async () => {
-      const company = new Company();
-      company.id = 'company-uuid';
-      company.nit = '900000001';
-      company.name = 'Test Company';
-      company.sectors = ['432115'];
-      company.regions = ['25'];
-      company.contractingCapacity = 500000;
+			const contractForA = new CompanyContract();
+			contractForA.id = "ctr-1";
+			contractForA.company = companyA;
 
-      const notice1 = new ProcurementNotice();
-      notice1.id = 'notice-uuid-1';
-      notice1.status = 'ENRICHING';
-      notice1.unspscCode = '43211502';
-      notice1.value = 100000;
-      notice1.department = 'Cundinamarca';
+			noticeRepo.findOne.mockResolvedValue(notice);
+			noticeRepo.save.mockResolvedValue(notice);
+			companyRepo.find.mockResolvedValue([companyA, companyB]);
+			contractRepo.find.mockResolvedValue([contractForA]);
 
-      const notice2 = new ProcurementNotice();
-      notice2.id = 'notice-uuid-2';
-      notice2.status = 'ENRICHING';
-      notice2.unspscCode = '80101502'; // will be excluded
-      notice2.value = 100000;
-      notice2.department = 'Cundinamarca';
+			const job = {
+				name: "scoring-dispatch",
+				id: "job-1",
+				data: {
+					procurementNoticeId: "notice-uuid",
+					secopId: "secop-id",
+					sourceEvent: "NewProcurementNoticeEvent",
+				},
+			} as Job;
 
-      companyRepo.findOne.mockResolvedValue(company);
-      noticeRepo.find.mockResolvedValue([notice1, notice2]);
-      contractRepo.find.mockResolvedValue([]);
+			const result = await worker.process(job);
 
-      matchingResultRepo.findOne.mockResolvedValue(null);
-      matchingResultRepo.create.mockImplementation((dto: any) => dto);
-      matchingResultRepo.save.mockImplementation((dto: any) => Promise.resolve({ id: 'res-id', ...dto }));
-      scoreLogRepo.create.mockImplementation((dto: any) => dto);
-      scoreLogRepo.save.mockImplementation((dto: any) => Promise.resolve({ id: 'log-id', ...dto }));
+			expect(result).toEqual({ processed: true, companiesMatched: 2 });
+			expect(scoringPersistence.evaluateAndPersist).toHaveBeenCalledTimes(2);
+			expect(scoringPersistence.evaluateAndPersist).toHaveBeenCalledWith(
+				companyA,
+				notice,
+				[contractForA],
+			);
+			expect(scoringPersistence.evaluateAndPersist).toHaveBeenCalledWith(
+				companyB,
+				notice,
+				[],
+			);
+		});
+	});
 
-      llmProvider.chat.mockResolvedValue({ content: 'LLM justification' });
+	describe("company-batch-scoring handler", () => {
+		it("throws if the company does not exist", async () => {
+			companyRepo.findOne.mockResolvedValue(null);
+			const job = {
+				name: "company-batch-scoring",
+				id: "job-2",
+				data: { companyId: "company-uuid", noticeIds: ["notice-uuid-1"] },
+			} as Job;
 
-      const job = {
-        name: 'company-batch-scoring',
-        id: 'job-2',
-        data: { companyId: 'company-uuid', noticeIds: ['notice-uuid-1', 'notice-uuid-2'] },
-      } as Job;
+			await expect(worker.process(job)).rejects.toThrow(
+				"Company company-uuid not found",
+			);
+		});
 
-      const result = await worker.process(job);
+		it("delegates evaluation to ScoringPersistenceService for each notice", async () => {
+			const company = new Company();
+			company.id = "company-uuid";
+			company.name = "Test Company";
 
-      expect(result).toEqual({ processed: true, noticesMatched: 2 });
+			const notice1 = new ProcurementNotice();
+			notice1.id = "notice-uuid-1";
+			const notice2 = new ProcurementNotice();
+			notice2.id = "notice-uuid-2";
 
-      // Should have saved 2 MatchingResults and 2 ScoreLogs
-      expect(matchingResultRepo.save).toHaveBeenCalledTimes(2);
-      expect(scoreLogRepo.save).toHaveBeenCalledTimes(2);
+			companyRepo.findOne.mockResolvedValue(company);
+			contractRepo.find.mockResolvedValue([]);
+			noticeRepo.find.mockResolvedValue([notice1, notice2]);
 
-      // First notice was viable/passed
-      const match1 = matchingResultRepo.save.mock.calls[0][0];
-      expect(match1.notice.id).toBe('notice-uuid-1');
-      expect(match1.status).toBe('PASSED');
+			const job = {
+				name: "company-batch-scoring",
+				id: "job-2",
+				data: {
+					companyId: "company-uuid",
+					noticeIds: ["notice-uuid-1", "notice-uuid-2"],
+				},
+			} as Job;
 
-      // Second notice was excluded
-      const match2 = matchingResultRepo.save.mock.calls[1][0];
-      expect(match2.notice.id).toBe('notice-uuid-2');
-      expect(match2.status).toBe('EXCLUDED');
+			const result = await worker.process(job);
 
-      // Score logs should have proper category
-      const log1 = scoreLogRepo.save.mock.calls[0][0];
-      expect(log1.category).not.toBe('EXCLUIDO');
-      expect(log1.explanation).toBe('LLM justification');
-
-      const log2 = scoreLogRepo.save.mock.calls[1][0];
-      expect(log2.category).toBe('EXCLUIDO');
-      expect(log2.explanation).toContain('código UNSPSC'); // rule-based fallback
-    });
-  });
+			expect(result).toEqual({ processed: true, noticesMatched: 2 });
+			expect(scoringPersistence.evaluateAndPersist).toHaveBeenCalledTimes(2);
+			expect(scoringPersistence.evaluateAndPersist).toHaveBeenCalledWith(
+				company,
+				notice1,
+				[],
+			);
+			expect(scoringPersistence.evaluateAndPersist).toHaveBeenCalledWith(
+				company,
+				notice2,
+				[],
+			);
+		});
+	});
 });
