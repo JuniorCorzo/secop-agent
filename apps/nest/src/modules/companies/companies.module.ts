@@ -11,5 +11,9 @@ import { CompaniesController } from './controllers/companies.controller';
   providers: [CompaniesService],
   exports: [CompaniesService, TypeOrmModule],
 })
+/**
+ * Module responsible for managing companies and their related contracts.
+ * Registers TypeORM entities for Company and CompanyContract, and exports CompaniesService.
+ */
 export class CompaniesModule {}
 

@@ -8,10 +8,18 @@ import { ScoringResult } from '../interfaces/scoring-result.interface';
 
 export { ScoringResult };
 
+/**
+ * Service that computes affinity scores between companies and procurement notices.
+ */
 @Injectable()
 export class ScoringEngineService {
   /**
    * Computes matching score (0-100) between a company and a notice.
+   *
+   * @param company - The company profile to evaluate.
+   * @param notice - The procurement notice to match against.
+   * @param contracts - The list of past contracts executed by the company.
+   * @returns A ScoringResult containing the total score and breakdown components.
    */
   computeScore(
     company: Company,
@@ -49,6 +57,11 @@ export class ScoringEngineService {
 
   /**
    * Computes Technical Fit (0-40 points) between a company and a notice.
+   * Based on UNSPSC segment/family/class matches and cosine similarity of description/sectors.
+   *
+   * @param company - The company profile.
+   * @param notice - The procurement notice.
+   * @returns An object containing unspscMatch, semanticSimilarity, and score components.
    */
   private computeTechnicalFit(
     company: Company,
@@ -88,6 +101,11 @@ export class ScoringEngineService {
 
   /**
    * Computes Economic Fit (0-25 points) between a company and a notice.
+   * Based on the deviation between notice value and target ticket, and working capital capacity.
+   *
+   * @param company - The company profile.
+   * @param notice - The procurement notice.
+   * @returns An object containing ticketDeviation, cashFlowCapacity, and score components.
    */
   private computeEconomicFit(
     company: Company,
@@ -134,6 +152,11 @@ export class ScoringEngineService {
 
   /**
    * Computes Experience Match (0-20 points) based on company contracts and notice requirements.
+   * Matches past contract descriptions semantically and calculates density of matching UNSPSC codes.
+   *
+   * @param notice - The procurement notice.
+   * @param contracts - The list of company contracts.
+   * @returns An object containing semanticSimilarity, unspscDensity, and score components.
    */
   private computeExperienceMatch(
     notice: ProcurementNotice,
@@ -173,6 +196,12 @@ export class ScoringEngineService {
 
   /**
    * Computes Affinity & Geographical Match (0-15 points) based on location and past clients.
+   * Checks prior client relations via NIT matching and regional presence using DIVIPOLA codes.
+   *
+   * @param company - The company profile.
+   * @param notice - The procurement notice.
+   * @param contracts - The list of company contracts.
+   * @returns An object containing clientAffinity, geographicPresence, and score components.
    */
   private computeGeographicAffinity(
     company: Company,

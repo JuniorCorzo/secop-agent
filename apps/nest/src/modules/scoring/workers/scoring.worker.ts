@@ -12,11 +12,28 @@ import { MatchingResult } from '../entities/matching-result.entity';
 import { HardFiltersService } from '../services/hard-filters.service';
 import { ScoringEngineService } from '../services/scoring-engine.service';
 
+/**
+ * BullMQ background worker that processes scoring dispatch jobs.
+ * Evaluates procurement notices against all registered companies, checking hard filters and calculating affinity scores.
+ */
 @Processor(QUEUE_NAMES.SCORING)
 @Injectable()
 export class ScoringWorker extends WorkerHost {
+  /**
+   * Logger instance for the scoring worker.
+   */
   private readonly logger = new Logger(ScoringWorker.name);
 
+  /**
+   * Initializes the ScoringWorker.
+   *
+   * @param noticeRepository - Repository to interact with procurement notices.
+   * @param companyRepository - Repository to interact with companies.
+   * @param companyContractRepository - Repository to interact with company contracts.
+   * @param matchingResultRepository - Repository to interact with matching results.
+   * @param hardFiltersService - Service to evaluate hard exclusion filters.
+   * @param scoringEngineService - Service to calculate matching affinity scores.
+   */
   constructor(
     @InjectRepository(ProcurementNotice)
     private readonly noticeRepository: Repository<ProcurementNotice>,
@@ -32,6 +49,13 @@ export class ScoringWorker extends WorkerHost {
     super();
   }
 
+  /**
+   * Main entry point to process a scoring job.
+   * Fetches notice, removes existing matches, checks filters, scores each company, and persists results.
+   *
+   * @param job - The BullMQ job containing notice details.
+   * @returns A promise resolving to the processing summary.
+   */
   async process(job: Job<ScoringDispatchJobData>): Promise<{ processed: true; companiesMatched: number }> {
     const { procurementNoticeId, secopId } = job.data;
     this.logger.log(`Processing scoring match for notice ${procurementNoticeId} (${secopId})`);
@@ -52,6 +76,10 @@ export class ScoringWorker extends WorkerHost {
 
   /**
    * Fetches the procurement notice and transitions its status to SCORING.
+   *
+   * @param procurementNoticeId - The ID of the procurement notice to retrieve.
+   * @returns The transitioned ProcurementNotice entity.
+   * @throws Error if the notice is not found.
    */
   private async fetchAndTransitionNotice(procurementNoticeId: string): Promise<ProcurementNotice> {
     const notice = await this.noticeRepository.findOne({ where: { id: procurementNoticeId } });
@@ -66,6 +94,9 @@ export class ScoringWorker extends WorkerHost {
 
   /**
    * Deletes existing matching results for a notice to prevent duplicates.
+   *
+   * @param noticeId - The ID of the procurement notice.
+   * @returns A promise that resolves when deletion is complete.
    */
   private async deleteExistingResults(noticeId: string): Promise<void> {
     await this.matchingResultRepository.delete({ notice: { id: noticeId } });
@@ -73,6 +104,8 @@ export class ScoringWorker extends WorkerHost {
 
   /**
    * Fetches all companies and contracts from the database.
+   *
+   * @returns A promise resolving to an object containing lists of companies and contracts.
    */
   private async fetchCompaniesAndContracts(): Promise<{
     companies: Company[];
@@ -87,6 +120,9 @@ export class ScoringWorker extends WorkerHost {
 
   /**
    * Groups company contracts by their associated company ID.
+   *
+   * @param allContracts - The list of all contracts to group.
+   * @returns A record mapping company ID strings to arrays of their contracts.
    */
   private groupContractsByCompany(allContracts: CompanyContract[]): Record<string, CompanyContract[]> {
     const contractsByCompanyId: Record<string, CompanyContract[]> = {};
@@ -104,6 +140,11 @@ export class ScoringWorker extends WorkerHost {
 
   /**
    * Processes the hard filter evaluation and scoring match for all companies.
+   *
+   * @param notice - The procurement notice to match against.
+   * @param companies - The list of all companies.
+   * @param contractsByCompanyId - Grouped contracts by company ID.
+   * @returns A promise that resolves when all matches have been processed and saved.
    */
   private async processCompanyMatching(
     notice: ProcurementNotice,
@@ -145,11 +186,22 @@ export class ScoringWorker extends WorkerHost {
   }
 
   @OnWorkerEvent('completed')
+  /**
+   * Event handler called when a scoring job completes successfully.
+   *
+   * @param job - The completed BullMQ job.
+   */
   onCompleted(job: Job): void {
     this.logger.log(`Scoring job ${job.id} completed`);
   }
 
   @OnWorkerEvent('failed')
+  /**
+   * Event handler called when a scoring job fails.
+   *
+   * @param job - The failed BullMQ job.
+   * @param error - The error that caused the failure.
+   */
   onFailed(job: Job, error: Error): void {
     this.logger.error(`Scoring job ${job.id} failed: ${error.message}`);
   }

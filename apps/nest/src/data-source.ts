@@ -15,6 +15,12 @@ import { MatchingResult } from "./modules/scoring/entities/matching-result.entit
  * Reads DB config directly from process.env without full NestJS env validation
  * so the CLI works with a minimal .env containing only DB_* variables.
  */
+/**
+ * Converts a value to its boolean equivalent.
+ *
+ * @param value - The input value to check.
+ * @returns True if the value is explicitly true or the string "true", otherwise false.
+ */
 const toBoolean = (value: unknown): boolean =>
 	value === true || value === "true";
 
@@ -29,6 +35,9 @@ const db = databaseConfig({
 	DB_LOGGING: toBoolean(process.env.DB_LOGGING),
 });
 
+/**
+ * TypeORM database configuration options used by the data source.
+ */
 export const dataSourceOptions: DataSourceOptions = {
 	type: "postgres",
 	host: db.host,
@@ -55,4 +64,7 @@ export const dataSourceOptions: DataSourceOptions = {
 	...(db.ssl ? { ssl: { rejectUnauthorized: false } } : {}),
 };
 
+/**
+ * The default export of the configured TypeORM DataSource instance.
+ */
 export default new DataSource(dataSourceOptions);

@@ -14,12 +14,29 @@ import { ScoringEngineService } from './services/scoring-engine.service';
 import { ScoringWorker } from './workers/scoring.worker';
 
 @Injectable()
+/**
+ * Event listener that dispatches incoming procurement notices to the scoring queue.
+ */
 export class ScoringDispatchListener {
+  /**
+   * Logger instance for the scoring dispatch listener.
+   */
   private readonly logger = new Logger(ScoringDispatchListener.name);
 
+  /**
+   * Initializes the ScoringDispatchListener.
+   *
+   * @param scoringDispatchProducer - Producer service to enqueue scoring dispatch jobs.
+   */
   constructor(private readonly scoringDispatchProducer: ScoringDispatchProducer) {}
 
   @OnEvent(NewProcurementNoticeEvent.EVENT_NAME)
+  /**
+   * Listens to the procurement notice creation event and triggers scoring matching.
+   *
+   * @param event - The event payload containing notice details.
+   * @returns A promise that resolves when the job is successfully queued.
+   */
   async handle(event: NewProcurementNoticeEvent): Promise<void> {
     if (!event.procurementNoticeId || !event.secopId) {
       this.logger.warn('Skipping scoring dispatch for invalid procurement notice event');
@@ -48,5 +65,8 @@ export class ScoringDispatchListener {
   ],
   exports: [HardFiltersService, ScoringEngineService],
 })
+/**
+ * Module responsible for coordinating the scoring worker, hard filters, and affinity evaluations.
+ */
 export class ScoringModule {}
 

@@ -1,3 +1,9 @@
+/**
+ * Normalizes a string by stripping accents, converting to uppercase, and keeping only alphanumeric characters.
+ *
+ * @param str - The input string to normalize.
+ * @returns The normalized string.
+ */
 function normalizeString(str: string): string {
   return str
     .normalize("NFD")
@@ -53,6 +59,9 @@ const VALID_CODES = new Set(Object.values(DIVIPOLA_CODES));
 /**
  * Normalizes a department name and returns its 2-digit DANE DIVIPOLA code.
  * If the input is already a valid 2-digit DIVIPOLA code, it returns it directly.
+ *
+ * @param department - The department name or code to evaluate.
+ * @returns The matching 2-digit DIVIPOLA code, or null if not found.
  */
 export function getDepartmentCode(department: string | null | undefined): string | null {
   if (!department) return null;

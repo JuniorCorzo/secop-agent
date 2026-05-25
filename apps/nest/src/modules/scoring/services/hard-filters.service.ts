@@ -7,6 +7,9 @@ import { EvaluationResult } from '../interfaces/evaluation-result.interface';
 
 export { EvaluationResult };
 
+/**
+ * Service responsible for evaluating procurement notices against a company's hard exclusion criteria.
+ */
 @Injectable()
 export class HardFiltersService {
   /**
@@ -14,6 +17,11 @@ export class HardFiltersService {
    * Excludes notices that don't satisfy financial limits, residual capacity,
    * UNSPSC sector hierarchies, DIVIPOLA geography, excluded modalities/contract types,
    * and deadlines.
+   *
+   * @param company - The company profile to evaluate against.
+   * @param notice - The procurement notice to evaluate.
+   * @param activeContracts - The list of currently active/ongoing contracts of the company.
+   * @returns An EvaluationResult representing whether the notice passed all hard filters.
    */
   evaluate(
     company: Company,
@@ -45,6 +53,9 @@ export class HardFiltersService {
 
   /**
    * Validates the active notice deadline.
+   *
+   * @param notice - The procurement notice to check.
+   * @returns An EvaluationResult if the deadline is expired, or null if it passes.
    */
   private validateDeadline(notice: ProcurementNotice): EvaluationResult | null {
     if (notice.source === 'SECOP_II' && notice.deadlineDate) {
@@ -62,6 +73,10 @@ export class HardFiltersService {
 
   /**
    * Validates if the contracting modality is excluded for the company.
+   *
+   * @param company - The company profile.
+   * @param notice - The procurement notice to check.
+   * @returns An EvaluationResult if the modality is excluded, or null if it passes.
    */
   private validateExcludedModality(company: Company, notice: ProcurementNotice): EvaluationResult | null {
     if (
@@ -85,6 +100,10 @@ export class HardFiltersService {
 
   /**
    * Validates if the contract type is excluded for the company.
+   *
+   * @param company - The company profile.
+   * @param notice - The procurement notice to check.
+   * @returns An EvaluationResult if the contract type is excluded, or null if it passes.
    */
   private validateExcludedContractType(company: Company, notice: ProcurementNotice): EvaluationResult | null {
     if (
@@ -108,6 +127,10 @@ export class HardFiltersService {
 
   /**
    * Validates if the notice value exceeds the company's contracting capacity.
+   *
+   * @param company - The company profile.
+   * @param notice - The procurement notice to check.
+   * @returns An EvaluationResult if the notice value exceeds capacity, or null if it passes.
    */
   private validateFinancialCapacity(company: Company, notice: ProcurementNotice): EvaluationResult | null {
     if (notice.value !== null && notice.value !== undefined) {
@@ -126,6 +149,10 @@ export class HardFiltersService {
 
   /**
    * Validates if the notice department matches the company's regional coverage.
+   *
+   * @param company - The company profile.
+   * @param notice - The procurement notice to check.
+   * @returns An EvaluationResult if there is a geographic mismatch, or null if it passes.
    */
   private validateGeographicCoverage(company: Company, notice: ProcurementNotice): EvaluationResult | null {
     if (company.regions && company.regions.length > 0) {
@@ -143,6 +170,10 @@ export class HardFiltersService {
 
   /**
    * Validates UNSPSC sector match under company policy.
+   *
+   * @param company - The company profile.
+   * @param notice - The procurement notice to check.
+   * @returns An EvaluationResult if there is a UNSPSC sector mismatch, or null if it passes.
    */
   private validateUnspscHierarchy(company: Company, notice: ProcurementNotice): EvaluationResult | null {
     if (notice.unspscCode && company.sectors && company.sectors.length > 0) {
@@ -168,6 +199,11 @@ export class HardFiltersService {
 
   /**
    * Validates residual capacity for civil works (obra) contracts.
+   *
+   * @param company - The company profile.
+   * @param notice - The procurement notice to check.
+   * @param activeContracts - The list of active contracts for calculating current execution workload.
+   * @returns An EvaluationResult if residual capacity is insufficient, or null if it passes.
    */
   private validateResidualCapacity(
     company: Company,
