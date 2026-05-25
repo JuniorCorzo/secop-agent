@@ -3,19 +3,9 @@ import { Company } from '../../companies/entities/company.entity';
 import { ProcurementNotice } from '../../procurement-notices/entities/procurement-notice.entity';
 import { CompanyContract } from '../../companies/entities/company-contract.entity';
 import { getDepartmentCode } from '../utils/divipola.utils';
+import { EvaluationResult } from '../interfaces/evaluation-result.interface';
 
-export interface EvaluationResult {
-  passed: boolean;
-  reason?:
-    | 'FINANCIAL_CAPACITY'
-    | 'RESIDUAL_CAPACITY'
-    | 'UNSPSC_MISMATCH'
-    | 'GEOGRAPHIC_MISMATCH'
-    | 'MODALITY_EXCLUSION'
-    | 'CONTRACT_TYPE_EXCLUSION'
-    | 'DEADLINE_EXPIRED';
-  justification: string;
-}
+export { EvaluationResult };
 
 @Injectable()
 export class HardFiltersService {
@@ -30,7 +20,33 @@ export class HardFiltersService {
     notice: ProcurementNotice,
     activeContracts: CompanyContract[],
   ): EvaluationResult {
-    // 1. Active Notice Deadline Validation
+    const validations = [
+      () => this.validateDeadline(notice),
+      () => this.validateExcludedModality(company, notice),
+      () => this.validateExcludedContractType(company, notice),
+      () => this.validateFinancialCapacity(company, notice),
+      () => this.validateGeographicCoverage(company, notice),
+      () => this.validateUnspscHierarchy(company, notice),
+      () => this.validateResidualCapacity(company, notice, activeContracts),
+    ];
+
+    for (const validation of validations) {
+      const result = validation();
+      if (result && !result.passed) {
+        return result;
+      }
+    }
+
+    return {
+      passed: true,
+      justification: 'La empresa cumple con todos los requisitos y filtros duros establecidos para este proceso.',
+    };
+  }
+
+  /**
+   * Validates the active notice deadline.
+   */
+  private validateDeadline(notice: ProcurementNotice): EvaluationResult | null {
     if (notice.source === 'SECOP_II' && notice.deadlineDate) {
       const deadline = new Date(notice.deadlineDate);
       if (Date.now() > deadline.getTime()) {
@@ -41,8 +57,13 @@ export class HardFiltersService {
         };
       }
     }
+    return null;
+  }
 
-    // 2. Excluded Modality Filter
+  /**
+   * Validates if the contracting modality is excluded for the company.
+   */
+  private validateExcludedModality(company: Company, notice: ProcurementNotice): EvaluationResult | null {
     if (
       notice.contractingModality &&
       company.excludedModalities &&
@@ -59,8 +80,13 @@ export class HardFiltersService {
         };
       }
     }
+    return null;
+  }
 
-    // 3. Excluded Contract Type Filter
+  /**
+   * Validates if the contract type is excluded for the company.
+   */
+  private validateExcludedContractType(company: Company, notice: ProcurementNotice): EvaluationResult | null {
     if (
       notice.contractType &&
       company.excludedContractTypes &&
@@ -77,8 +103,13 @@ export class HardFiltersService {
         };
       }
     }
+    return null;
+  }
 
-    // 4. Financial Capacity Filter
+  /**
+   * Validates if the notice value exceeds the company's contracting capacity.
+   */
+  private validateFinancialCapacity(company: Company, notice: ProcurementNotice): EvaluationResult | null {
     if (notice.value !== null && notice.value !== undefined) {
       const noticeValue = Number(notice.value);
       const companyCapacity = Number(company.contractingCapacity || 0);
@@ -90,8 +121,13 @@ export class HardFiltersService {
         };
       }
     }
+    return null;
+  }
 
-    // 5. Geographic Coverage Intersect
+  /**
+   * Validates if the notice department matches the company's regional coverage.
+   */
+  private validateGeographicCoverage(company: Company, notice: ProcurementNotice): EvaluationResult | null {
     if (company.regions && company.regions.length > 0) {
       const deptCode = getDepartmentCode(notice.department);
       if (!deptCode || !company.regions.includes(deptCode)) {
@@ -102,8 +138,13 @@ export class HardFiltersService {
         };
       }
     }
+    return null;
+  }
 
-    // 6. UNSPSC Sector Hierarchy Filter
+  /**
+   * Validates UNSPSC sector match under company policy.
+   */
+  private validateUnspscHierarchy(company: Company, notice: ProcurementNotice): EvaluationResult | null {
     if (notice.unspscCode && company.sectors && company.sectors.length > 0) {
       const policy = company.unspscMatchPolicy || 'strict';
       const matchLen = policy === 'flexible' ? 4 : 6;
@@ -122,8 +163,17 @@ export class HardFiltersService {
         };
       }
     }
+    return null;
+  }
 
-    // 7. Residual Capacity Validation
+  /**
+   * Validates residual capacity for civil works (obra) contracts.
+   */
+  private validateResidualCapacity(
+    company: Company,
+    notice: ProcurementNotice,
+    activeContracts: CompanyContract[],
+  ): EvaluationResult | null {
     const isObra = notice.contractType?.toLowerCase() === 'obra';
     if (isObra && notice.value !== null && notice.value !== undefined) {
       const yearsOfExistence =
@@ -165,10 +215,7 @@ export class HardFiltersService {
         };
       }
     }
-
-    return {
-      passed: true,
-      justification: 'La empresa cumple con todos los requisitos y filtros duros establecidos para este proceso.',
-    };
+    return null;
   }
 }
+

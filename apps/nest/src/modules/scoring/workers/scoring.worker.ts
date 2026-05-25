@@ -36,25 +36,59 @@ export class ScoringWorker extends WorkerHost {
     const { procurementNoticeId, secopId } = job.data;
     this.logger.log(`Processing scoring match for notice ${procurementNoticeId} (${secopId})`);
 
+    const notice = await this.fetchAndTransitionNotice(procurementNoticeId);
+
+    await this.deleteExistingResults(notice.id);
+
+    const { companies, allContracts } = await this.fetchCompaniesAndContracts();
+
+    const contractsByCompanyId = this.groupContractsByCompany(allContracts);
+
+    await this.processCompanyMatching(notice, companies, contractsByCompanyId);
+
+    this.logger.log(`Completed matching for notice ${procurementNoticeId} against ${companies.length} companies`);
+    return { processed: true, companiesMatched: companies.length };
+  }
+
+  /**
+   * Fetches the procurement notice and transitions its status to SCORING.
+   */
+  private async fetchAndTransitionNotice(procurementNoticeId: string): Promise<ProcurementNotice> {
     const notice = await this.noticeRepository.findOne({ where: { id: procurementNoticeId } });
     if (!notice) {
       throw new Error(`Procurement notice ${procurementNoticeId} not found`);
     }
 
-    // Transition notice status to SCORING immediately
     notice.status = 'SCORING';
     await this.noticeRepository.save(notice);
+    return notice;
+  }
 
-    // Delete existing matching results for this notice to avoid duplicates
-    await this.matchingResultRepository.delete({ notice: { id: notice.id } });
+  /**
+   * Deletes existing matching results for a notice to prevent duplicates.
+   */
+  private async deleteExistingResults(noticeId: string): Promise<void> {
+    await this.matchingResultRepository.delete({ notice: { id: noticeId } });
+  }
 
-    // Fetch all companies and contracts
+  /**
+   * Fetches all companies and contracts from the database.
+   */
+  private async fetchCompaniesAndContracts(): Promise<{
+    companies: Company[];
+    allContracts: CompanyContract[];
+  }> {
     const companies = await this.companyRepository.find();
     const allContracts = await this.companyContractRepository.find({
       relations: { company: true },
     });
+    return { companies, allContracts };
+  }
 
-    // Group contracts by company ID
+  /**
+   * Groups company contracts by their associated company ID.
+   */
+  private groupContractsByCompany(allContracts: CompanyContract[]): Record<string, CompanyContract[]> {
     const contractsByCompanyId: Record<string, CompanyContract[]> = {};
     for (const contract of allContracts) {
       if (contract.company?.id) {
@@ -65,7 +99,17 @@ export class ScoringWorker extends WorkerHost {
         contractsByCompanyId[cId].push(contract);
       }
     }
+    return contractsByCompanyId;
+  }
 
+  /**
+   * Processes the hard filter evaluation and scoring match for all companies.
+   */
+  private async processCompanyMatching(
+    notice: ProcurementNotice,
+    companies: Company[],
+    contractsByCompanyId: Record<string, CompanyContract[]>,
+  ): Promise<void> {
     for (const company of companies) {
       const companyContracts = contractsByCompanyId[company.id] || [];
 
@@ -98,9 +142,6 @@ export class ScoringWorker extends WorkerHost {
 
       await this.matchingResultRepository.save(matchingResult);
     }
-
-    this.logger.log(`Completed matching for notice ${procurementNoticeId} against ${companies.length} companies`);
-    return { processed: true, companiesMatched: companies.length };
   }
 
   @OnWorkerEvent('completed')

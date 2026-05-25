@@ -4,33 +4,9 @@ import { ProcurementNotice } from '../../procurement-notices/entities/procuremen
 import { CompanyContract } from '../../companies/entities/company-contract.entity';
 import { cosineSimilarity } from '../utils/text-similarity.utils';
 import { getDepartmentCode } from '../utils/divipola.utils';
+import { ScoringResult } from '../interfaces/scoring-result.interface';
 
-export interface ScoringResult {
-  score: number;
-  vectorBreakdown: {
-    technicalFit: {
-      unspscMatch: number;
-      semanticSimilarity: number;
-      score: number;
-    };
-    economicFit: {
-      ticketDeviation: number;
-      cashFlowCapacity: number;
-      score: number;
-    };
-    experienceMatch: {
-      semanticSimilarity: number;
-      unspscDensity: number;
-      score: number;
-    };
-    affinityGeographical: {
-      clientAffinity: number;
-      geographicPresence: number;
-      score: number;
-    };
-  };
-  justification: string;
-}
+export { ScoringResult };
 
 @Injectable()
 export class ScoringEngineService {
@@ -42,9 +18,42 @@ export class ScoringEngineService {
     notice: ProcurementNotice,
     contracts: CompanyContract[],
   ): ScoringResult {
-    // ----------------------------------------------------
-    // 1. Technical Fit (0-40 points)
-    // ----------------------------------------------------
+    const technicalFit = this.computeTechnicalFit(company, notice);
+    const economicFit = this.computeEconomicFit(company, notice);
+    const experienceMatch = this.computeExperienceMatch(notice, contracts);
+    const affinityGeographical = this.computeGeographicAffinity(company, notice, contracts);
+
+    const totalScore = Number(
+      (
+        technicalFit.score +
+        economicFit.score +
+        experienceMatch.score +
+        affinityGeographical.score
+      ).toFixed(2),
+    );
+
+    // Natural Language Justification
+    const justification = `Puntaje total de afinidad: ${totalScore}/100. Desglose: Technical Fit de ${technicalFit.score}/40 (cruce UNSPSC: ${technicalFit.unspscMatch}, similitud semántica: ${technicalFit.semanticSimilarity}), Economic Fit de ${economicFit.score}/25 (desviación de presupuesto: ${economicFit.ticketDeviation}, flujo de caja mensual: ${economicFit.cashFlowCapacity}), Experience Match de ${experienceMatch.score}/20 (densidad sectorial: ${experienceMatch.unspscDensity}, similitud semántica de experiencia: ${experienceMatch.semanticSimilarity}), y afinidad geográfica/entidad de ${affinityGeographical.score}/15.`;
+
+    return {
+      score: totalScore,
+      vectorBreakdown: {
+        technicalFit,
+        economicFit,
+        experienceMatch,
+        affinityGeographical,
+      },
+      justification,
+    };
+  }
+
+  /**
+   * Computes Technical Fit (0-40 points) between a company and a notice.
+   */
+  private computeTechnicalFit(
+    company: Company,
+    notice: ProcurementNotice,
+  ): { unspscMatch: number; semanticSimilarity: number; score: number } {
     let unspscMatch = 0;
     if (notice.unspscCode && company.sectors && company.sectors.length > 0) {
       const code6 = notice.unspscCode.substring(0, 6);
@@ -70,9 +79,20 @@ export class ScoringEngineService {
     const techSemantic = Number((techSim * 20).toFixed(2));
     const technicalFitScore = Number((unspscMatch + techSemantic).toFixed(2));
 
-    // ----------------------------------------------------
-    // 2. Economic Fit (0-25 points)
-    // ----------------------------------------------------
+    return {
+      unspscMatch,
+      semanticSimilarity: techSemantic,
+      score: technicalFitScore,
+    };
+  }
+
+  /**
+   * Computes Economic Fit (0-25 points) between a company and a notice.
+   */
+  private computeEconomicFit(
+    company: Company,
+    notice: ProcurementNotice,
+  ): { ticketDeviation: number; cashFlowCapacity: number; score: number } {
     let ticketDeviationScore = 0;
     const noticeValue = Number(notice.value || 0);
     const targetTicket = Number(company.targetTicket || 0);
@@ -105,11 +125,22 @@ export class ScoringEngineService {
     }
     const economicFitScore = Number((ticketDeviationScore + cashFlowCapacityScore).toFixed(2));
 
-    // ----------------------------------------------------
-    // 3. Experience Match (0-20 points)
-    // ----------------------------------------------------
+    return {
+      ticketDeviation: ticketDeviationScore,
+      cashFlowCapacity: cashFlowCapacityScore,
+      score: economicFitScore,
+    };
+  }
+
+  /**
+   * Computes Experience Match (0-20 points) based on company contracts and notice requirements.
+   */
+  private computeExperienceMatch(
+    notice: ProcurementNotice,
+    contracts: CompanyContract[],
+  ): { semanticSimilarity: number; unspscDensity: number; score: number } {
     const liquidContracts = contracts.filter((c) => c.status?.toUpperCase() === 'LIQUIDADO');
-    
+
     let maxContractSim = 0.0;
     if (notice.description) {
       for (const contract of liquidContracts) {
@@ -133,9 +164,23 @@ export class ScoringEngineService {
     const unspscDensity = Math.min(10, matchingUnspscCount * 2);
     const experienceMatchScore = Number((expSemantic + unspscDensity).toFixed(2));
 
-    // ----------------------------------------------------
-    // 4. Affinity & Geographical Match (0-15 points)
-    // ----------------------------------------------------
+    return {
+      semanticSimilarity: expSemantic,
+      unspscDensity,
+      score: experienceMatchScore,
+    };
+  }
+
+  /**
+   * Computes Affinity & Geographical Match (0-15 points) based on location and past clients.
+   */
+  private computeGeographicAffinity(
+    company: Company,
+    notice: ProcurementNotice,
+    contracts: CompanyContract[],
+  ): { clientAffinity: number; geographicPresence: number; score: number } {
+    const liquidContracts = contracts.filter((c) => c.status?.toUpperCase() === 'LIQUIDADO');
+
     let clientAffinity = 0;
     if (notice.entityNit) {
       const cleanedEntityNit = notice.entityNit.replace(/[^a-zA-Z0-9]/g, '');
@@ -154,8 +199,7 @@ export class ScoringEngineService {
     if (deptCode) {
       const isRegisteredRegion = company.regions && company.regions.includes(deptCode);
       const pastContractsInDept = liquidContracts.filter((c) => {
-        // Assume presence if there are 3+ contracts executed in that same department (using matching regions logic/mock)
-        // Here we can also assume geographic presence if it matches the registered regions or past experience
+        // Assume presence if there are 3+ contracts executed in that same department
         return false;
       }).length;
 
@@ -165,44 +209,11 @@ export class ScoringEngineService {
     }
     const affinityGeographicalScore = Number((clientAffinity + geographicPresence).toFixed(2));
 
-    // Total Score
-    const totalScore = Number(
-      (
-        technicalFitScore +
-        economicFitScore +
-        experienceMatchScore +
-        affinityGeographicalScore
-      ).toFixed(2),
-    );
-
-    // Natural Language Justification
-    const justification = `Puntaje total de afinidad: ${totalScore}/100. Desglose: Technical Fit de ${technicalFitScore}/40 (cruce UNSPSC: ${unspscMatch}, similitud semántica: ${techSemantic}), Economic Fit de ${economicFitScore}/25 (desviación de presupuesto: ${ticketDeviationScore}, flujo de caja mensual: ${cashFlowCapacityScore}), Experience Match de ${experienceMatchScore}/20 (densidad sectorial: ${unspscDensity}, similitud semántica de experiencia: ${expSemantic}), y afinidad geográfica/entidad de ${affinityGeographicalScore}/15.`;
-
     return {
-      score: totalScore,
-      vectorBreakdown: {
-        technicalFit: {
-          unspscMatch,
-          semanticSimilarity: techSemantic,
-          score: technicalFitScore,
-        },
-        economicFit: {
-          ticketDeviation: ticketDeviationScore,
-          cashFlowCapacity: cashFlowCapacityScore,
-          score: economicFitScore,
-        },
-        experienceMatch: {
-          semanticSimilarity: expSemantic,
-          unspscDensity,
-          score: experienceMatchScore,
-        },
-        affinityGeographical: {
-          clientAffinity,
-          geographicPresence,
-          score: affinityGeographicalScore,
-        },
-      },
-      justification,
+      clientAffinity,
+      geographicPresence,
+      score: affinityGeographicalScore,
     };
   }
 }
+
