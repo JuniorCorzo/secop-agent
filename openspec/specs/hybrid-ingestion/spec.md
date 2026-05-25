@@ -15,27 +15,23 @@ Provide a bulk ingestion boundary that accepts normalized SECOP notice payloads,
 - Bulk ingestion MUST return quickly with async job tracking instead of blocking on record processing.
 - Batch size limits and payload validation MUST protect worker and database capacity.
 - The automatic scheduler path MUST call `bulkUpsert()` directly without going through the HTTP endpoint.
-
 ## Requirements
-
 ### Requirement: Bulk Submission Contract
 
-El sistema MUST exponer `POST /procurement-notices/bulk` para ingestas manuales o externas. La ingesta automática ahora la realiza el scheduler interno de NestJS directamente — no depende de clientes externos como Hermes.
+The system MUST expose `POST /procurement-notices/bulk` for authorized clients to submit normalized `ProcurementNotice` batches and receive a persistent asynchronous ingestion job identifier. Accepted requests SHALL forward into the existing bulk ingestion pipeline rather than create a second ingestion path.
+(Previously: Exposed `POST /convocatorias/bulk` for async batch submission.)
 
-#### Scenario: Ingesta automática interna
-- **WHEN** el scheduler interno completa un ciclo de paginación SODA
-- **THEN** los registros normalizados se persisten vía `bulkUpsert()` directamente
-- **AND** no se usa el endpoint HTTP interno (evita overhead de red innecesario)
+#### Scenario: Valid bulk submission
+- GIVEN an authorized client sends a valid normalized batch
+- WHEN `POST /procurement-notices/bulk` is called
+- THEN the system accepts the batch for asynchronous ingestion
+- AND returns a persisted ingestion job identifier
 
-#### Scenario: Ingesta manual vía endpoint
-- **WHEN** un cliente autorizado envía un batch normalizado a `POST /procurement-notices/bulk`
-- **THEN** el sistema acepta el batch para ingesta asíncrona
-- **AND** retorna un job identifier para inspección posterior
-
-#### Scenario: Batch inválido rechazado
-- **WHEN** un cliente envía registros malformados o excede los límites del batch
-- **THEN** el sistema rechaza el request antes de encolar trabajo
-- **AND** no ocurren efectos secundarios de ingesta
+#### Scenario: Invalid bulk submission
+- GIVEN a client sends malformed records or exceeds allowed batch constraints
+- WHEN `POST /procurement-notices/bulk` is called
+- THEN the system rejects the request before enqueueing work
+- AND no ingestion side effects occur
 
 ### Requirement: Idempotent Ingestion Outcome
 
@@ -55,18 +51,23 @@ The system MUST process bulk ingestion with upsert semantics based on stable SEC
 
 ### Requirement: Basic Job Result Reporting
 
-The system MUST make terminal ingestion outcomes inspectable with counts sufficient to distinguish accepted, updated, and failed records at job level.
+The system MUST persist an ingestion job for every accepted bulk submission, track non-terminal and terminal job status, and expose deterministic counts sufficient to distinguish created, updated, and failed records at job level.
+(Previously: Terminal outcomes were inspectable with summary counts only.)
+
+#### Scenario: Accepted request creates tracked ingestion job
+- GIVEN a valid bulk request is accepted
+- WHEN asynchronous processing is scheduled
+- THEN a persistent ingestion job exists before terminal completion
+- AND later inspection can distinguish that the job is still in progress
 
 #### Scenario: Completed job summary
-
 - GIVEN an ingestion job reaches terminal completion
 - WHEN job results are inspected through supported operational surfaces
-- THEN the system exposes summary counts for processed outcomes
+- THEN the system exposes deterministic status and summary counts for created, updated, and failed outcomes
 
 #### Scenario: Partial failure in chunked batch
-
 - GIVEN one chunk or record fails during asynchronous ingestion
 - WHEN the job reaches terminal state
-- THEN the system reports failure in job outcome
+- THEN the system reports terminal failure or partial-failure status deterministically
 - AND successful records from other valid chunks remain observable
 

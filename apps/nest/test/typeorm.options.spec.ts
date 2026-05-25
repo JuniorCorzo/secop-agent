@@ -1,6 +1,8 @@
 import { ConfigService } from '@nestjs/config';
 import { createTypeOrmOptions } from '../src/config/typeorm.options';
 import { IngestionJob } from '../src/modules/procurement-notices/entities/ingestion-job.entity';
+import { CompanyContract } from '../src/modules/companies/entities/company-contract.entity';
+import { MatchingResult } from '../src/modules/scoring/entities/matching-result.entity';
 
 describe('createTypeOrmOptions', () => {
   it('maps validated config to TypeORM options', () => {
@@ -46,9 +48,11 @@ describe('createTypeOrmOptions', () => {
     const options = createTypeOrmOptions(configService);
 
     expect(options.entities).toContain(IngestionJob);
+    expect(options.entities).toContain(CompanyContract);
+    expect(options.entities).toContain(MatchingResult);
   });
 
-  it('registers IngestionJob in data source entities', () => {
+  it('registers IngestionJob, CompanyContract and MatchingResult in data source entities', () => {
     const originalEnv = process.env;
     process.env = {
       ...originalEnv,
@@ -78,7 +82,11 @@ describe('createTypeOrmOptions', () => {
     const { dataSourceOptions } = require('../src/data-source') as typeof import('../src/data-source');
 
     expect(dataSourceOptions.entities).toEqual(
-      expect.arrayContaining([expect.objectContaining({ name: IngestionJob.name })]),
+      expect.arrayContaining([
+        expect.objectContaining({ name: IngestionJob.name }),
+        expect.objectContaining({ name: CompanyContract.name }),
+        expect.objectContaining({ name: MatchingResult.name }),
+      ]),
     );
 
     process.env = originalEnv;

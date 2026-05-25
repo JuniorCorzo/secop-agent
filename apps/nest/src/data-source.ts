@@ -7,11 +7,19 @@ import { ProcurementNotice } from "./modules/procurement-notices/entities/procur
 import { SectorKeyword } from "./modules/procurement-notices/entities/sector-keyword.entity";
 import { IngestionState } from "./modules/soda-ingestion/entities/ingestion-state.entity";
 import { Company } from "./modules/companies/entities/company.entity";
+import { CompanyContract } from "./modules/companies/entities/company-contract.entity";
+import { MatchingResult } from "./modules/scoring/entities/matching-result.entity";
 
 /**
  * TypeORM CLI data source — used only for migration:generate and migration:run.
  * Reads DB config directly from process.env without full NestJS env validation
  * so the CLI works with a minimal .env containing only DB_* variables.
+ */
+/**
+ * Converts a value to its boolean equivalent.
+ *
+ * @param value - The input value to check.
+ * @returns True if the value is explicitly true or the string "true", otherwise false.
  */
 const toBoolean = (value: unknown): boolean =>
 	value === true || value === "true";
@@ -27,6 +35,9 @@ const db = databaseConfig({
 	DB_LOGGING: toBoolean(process.env.DB_LOGGING),
 });
 
+/**
+ * TypeORM database configuration options used by the data source.
+ */
 export const dataSourceOptions: DataSourceOptions = {
 	type: "postgres",
 	host: db.host,
@@ -44,6 +55,8 @@ export const dataSourceOptions: DataSourceOptions = {
 		IngestionJob,
 		IngestionState,
 		Company,
+		CompanyContract,
+		MatchingResult,
 		SectorKeyword,
 	],
 	migrations: ["src/migrations/*.ts"],
@@ -51,4 +64,7 @@ export const dataSourceOptions: DataSourceOptions = {
 	...(db.ssl ? { ssl: { rejectUnauthorized: false } } : {}),
 };
 
+/**
+ * The default export of the configured TypeORM DataSource instance.
+ */
 export default new DataSource(dataSourceOptions);

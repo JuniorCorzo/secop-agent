@@ -6,8 +6,17 @@ import { ProcurementNotice } from "../modules/procurement-notices/entities/procu
 import { SectorKeyword } from "../modules/procurement-notices/entities/sector-keyword.entity";
 import { IngestionState } from "../modules/soda-ingestion/entities/ingestion-state.entity";
 import { Company } from "../modules/companies/entities/company.entity";
+import { CompanyContract } from "../modules/companies/entities/company-contract.entity";
+import { MatchingResult } from "../modules/scoring/entities/matching-result.entity";
 import { databaseConfig } from "./database.config";
 
+/**
+ * Creates and returns the TypeORM configurations for the application.
+ * Resolves database parameters from the environment using the config service.
+ *
+ * @param configService - The NestJS ConfigService instance to look up database configurations.
+ * @returns The TypeORM configuration options object containing connection credentials, settings, and registered entities.
+ */
 export const createTypeOrmOptions = (configService: ConfigService) => {
 	const rawDbSsl = configService.get("DB_SSL");
 	const rawDbLogging = configService.get("DB_LOGGING");
@@ -39,6 +48,8 @@ export const createTypeOrmOptions = (configService: ConfigService) => {
 			IngestionJob,
 			IngestionState,
 			Company,
+			CompanyContract,
+			MatchingResult,
 			SectorKeyword,
 		],
 		...(db.ssl ? { ssl: { rejectUnauthorized: false } } : {}),
