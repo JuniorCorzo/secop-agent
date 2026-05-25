@@ -1,15 +1,15 @@
 ## 1. Database Configuration and Migration
 
-- [ ] 1.1 Create the `ScoreLog` entity class in `apps/nest/src/modules/scoring/entities/score-log.entity.ts` representing the `score_logs` table
-- [ ] 1.2 Register `ScoreLog` in `apps/nest/src/config/typeorm.options.ts` and `apps/nest/src/data-source.ts`
-- [ ] 1.3 Generate the TypeORM migration `AddScoreLogsTable` using the command `bun run --cwd apps/nest migration:generate -- src/migrations/AddScoreLogsTable`
-- [ ] 1.4 Apply the database migration by running `bun run --cwd apps/nest migration:run`
+- [x] 1.1 Create the `ScoreLog` entity class in `apps/nest/src/modules/scoring/entities/score-log.entity.ts` representing the `score_logs` table
+- [x] 1.2 Register `ScoreLog` in `apps/nest/src/config/typeorm.options.ts` and `apps/nest/src/data-source.ts`
+- [x] 1.3 Generate the TypeORM migration `AddScoreLogsTable` using the command `bun run --cwd apps/nest migration:generate -- src/migrations/AddScoreLogsTable`
+- [x] 1.4 Apply the database migration by running `bun run --cwd apps/nest migration:run`
 
 ## 2. LLM Provider Layer
 
-- [ ] 2.1 Add `ChatOptions`, `ChatResponse`, `ChatMessage` definitions and the `LlmProvider` interface in `apps/nest/src/modules/llm/interfaces/llm-provider.interface.ts`
-- [ ] 2.2 Implement the `OpenCodeGoProvider` adapter class in `apps/nest/src/modules/llm/providers/opencode-go.provider.ts` integrating standard OpenAI `/v1/chat/completions`, `/v1/embeddings` and `/health` requests using Axios `HttpService`
-- [ ] 2.3 Wire and export `LlmProvider` using a custom provider token in `LlmModule` (`apps/nest/src/modules/llm/llm.module.ts`) and import `@nestjs/axios` `HttpModule`
+- [x] 2.1 Add `ChatOptions`, `ChatResponse`, `ChatMessage` definitions and the `LlmProvider` interface in `apps/nest/src/modules/llm/interfaces/llm-provider.interface.ts`
+- [x] 2.2 Implement the `OpenCodeGoProvider` adapter class in `apps/nest/src/modules/llm/providers/opencode-go.provider.ts` integrating standard OpenAI `/v1/chat/completions`, `/v1/embeddings` and `/health` requests using Axios `HttpService`
+- [x] 2.3 Wire and export `LlmProvider` using a custom provider token in `LlmModule` (`apps/nest/src/modules/llm/llm.module.ts`) and import `@nestjs/axios` `HttpModule`
 
 ## 3. Asynchronous Batch Queue Setup
 
@@ -32,7 +32,7 @@
 
 ## 6. Unit & Integration Testing (Strict TDD)
 
-- [ ] 6.1 Write unit tests for `OpenCodeGoProvider` using a mocked `HttpService` in `apps/nest/test/llm/opencode-go.provider.spec.ts`
+- [x] 6.1 Write unit tests for `OpenCodeGoProvider` using a mocked `HttpService` in `apps/nest/test/llm/opencode-go.provider.spec.ts`
 - [ ] 6.2 Write unit tests for scoring engine categorization and resilient fallback logic under `apps/nest/test/scoring/`
 - [ ] 6.3 Write integration tests for `ScoringWorker` verifying database persistence of `MatchingResult` and `ScoreLog` during job execution
 - [ ] 6.4 Execute all NestJS tests (`bun run --cwd apps/nest test`) and resolve lint errors
