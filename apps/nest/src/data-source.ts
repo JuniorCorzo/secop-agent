@@ -9,6 +9,7 @@ import { IngestionState } from "./modules/soda-ingestion/entities/ingestion-stat
 import { Company } from "./modules/companies/entities/company.entity";
 import { CompanyContract } from "./modules/companies/entities/company-contract.entity";
 import { MatchingResult } from "./modules/scoring/entities/matching-result.entity";
+import { ScoreLog } from "./modules/scoring/entities/score-log.entity";
 
 /**
  * TypeORM CLI data source — used only for migration:generate and migration:run.
@@ -57,6 +58,7 @@ export const dataSourceOptions: DataSourceOptions = {
 		Company,
 		CompanyContract,
 		MatchingResult,
+		ScoreLog,
 		SectorKeyword,
 	],
 	migrations: ["src/migrations/*.ts"],

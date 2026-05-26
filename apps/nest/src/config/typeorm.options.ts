@@ -8,6 +8,7 @@ import { IngestionState } from "../modules/soda-ingestion/entities/ingestion-sta
 import { Company } from "../modules/companies/entities/company.entity";
 import { CompanyContract } from "../modules/companies/entities/company-contract.entity";
 import { MatchingResult } from "../modules/scoring/entities/matching-result.entity";
+import { ScoreLog } from "../modules/scoring/entities/score-log.entity";
 import { databaseConfig } from "./database.config";
 
 /**
@@ -50,6 +51,7 @@ export const createTypeOrmOptions = (configService: ConfigService) => {
 			Company,
 			CompanyContract,
 			MatchingResult,
+			ScoreLog,
 			SectorKeyword,
 		],
 		...(db.ssl ? { ssl: { rejectUnauthorized: false } } : {}),
