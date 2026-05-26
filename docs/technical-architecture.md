@@ -84,7 +84,11 @@ stateDiagram-v2
     SCORING --> REJECTED: Licitación Rechazada
     SCORING --> CANCELLED: Licitación Cancelada
 
-    note right of PENDING: Nota: CANCELLED y REJECTED en SODA \n son filtrados durante la ingestión y no persisten.
+    note right of PENDING
+        Nota de Sistema:
+        CANCELLED y REJECTED en SODA
+        son filtrados durante la ingestión y no persisten.
+    end note
 ```
 
 ## 4. Estructura de Módulos (Backend)
